@@ -386,7 +386,7 @@ fn parse_settings(
                     let (x, y) = read_point(&mut parts)?;
                     target = Some(Point::new(x, y));
                 }
-                ClickMode::Sequence | ClickMode::Parallel => {
+                ClickMode::Sequence => {
                     interval_ms = parts
                         .next()
                         .ok_or_else(|| "ERR sequence requires interval_ms\n".to_string())?
@@ -564,30 +564,6 @@ mod tests {
         assert_eq!(status.settings.point_at(0), Some(Point::new(-10, 20)));
         assert_eq!(status.settings.point_at(2), Some(Point::new(500, 600)));
         assert!((status.settings.point_interval_ms() - 250.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn set_command_accepts_parallel_mode() {
-        let shared = SharedState::new(Settings::default(), false);
-
-        assert_eq!(
-            process("SET 50 left 10 0 0 0 1 parallel 150 2 1 2 3 4", &shared),
-            "OK\n"
-        );
-
-        let status = shared.status();
-        assert_eq!(status.settings.mode, ClickMode::Parallel);
-        assert_eq!(status.settings.point_count(), 2);
-        assert_eq!(status.settings.point_at(1), Some(Point::new(3, 4)));
-        assert!((status.settings.point_interval_ms() - 150.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn on_command_rejects_a_single_point_parallel_session() {
-        let shared = SharedState::new(Settings::default(), false);
-
-        assert!(process("ON 50 left 10 0 0 0 1 parallel 100 1 10 20", &shared).starts_with("ERR "));
-        assert!(!shared.status().enabled);
     }
 
     #[test]

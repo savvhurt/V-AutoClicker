@@ -18,7 +18,7 @@
 # V-AutoClicker
 
 **A fast, minimal, lightweight autoclicker written on Rust for Windows and Linux.**<br>
-Native input, four click modes, twelve themes, one small binary.
+Native input, three click modes, twelve themes, one small binary.
 
 [Download](https://github.com/savvhurt/V-AutoClicker/releases/latest) ·
 [CLI](#cli) ·
@@ -31,13 +31,14 @@ Native input, four click modes, twelve themes, one small binary.
 ## Highlights
 
 - **0.2-1000 CPS** with hold duration, jitter, start delay and a per-session limit.
-- **Cursor, Point, Sequence and Parallel modes** - click where the mouse is,
-  at fixed coordinates, through up to 16 points in order, or at every point
-  once per round.
+- **Cursor, Point and Sequence modes** - click where the mouse is, at fixed
+  coordinates, or through up to 16 points in order.
+- **Simple and Advanced layouts** - a compact Start/Stop panel or the full
+  tabbed interface, switchable at any time.
 - **Eyedropper** for capturing coordinates; single, double and triple clicks.
 - **Global hotkeys** on Windows, compositor bindings on Linux.
 - **Hold-to-click** on Windows with a second hotkey.
-- **Autostart** on both platforms, plus optional **close to tray** on Windows.
+- **Autostart** on both platforms, plus optional **minimize to tray** on Windows.
 - **12 themes**, six interface languages and automatic DPI scaling.
 - **One binary**: no arguments opens the GUI, subcommands stay on the CLI.
 - Settings live in `gui.toml` and are saved automatically.
@@ -118,10 +119,10 @@ binds {
 For GNOME or KDE create a custom shortcut with the command `v-autoclicker toggle`.
 Do not use `Mod+Shift+C` in niri: it is already bound to `center-column`.
 
-### Point, sequence and parallel modes
+### Point and sequence modes
 
-Point, sequence and parallel modes use `XWarpPointer`. They work on X11 and
-XWayland but not in native Wayland windows; the GUI shows a notice on Wayland.
+Point and sequence modes use `XWarpPointer`. They work on X11 and XWayland but
+not in native Wayland windows; the GUI shows a notice on Wayland.
 
 ## Windows
 
@@ -138,8 +139,9 @@ about an unsigned binary.
 
 - The global hotkey is recorded on the **Hotkeys** tab and applied live.
 - A second key can start clicking while held (**hold-to-click**).
-- **Close to tray** hides the window instead of quitting; **Exit** in the tray
-  menu always stops the daemon.
+- **Minimize to tray** hides the window when it is closed instead of quitting;
+  the minimize button still uses the taskbar. **Exit** in the tray menu always
+  stops the daemon.
 - **Start at login** writes the per-user value `V-AutoClicker` under
   `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 
@@ -186,13 +188,20 @@ v-autoclicker on --cps 20 --multi-click 2 --x 640 --y 360
 | `--hold-hotkey COMBO` | - | Windows hold-to-click key |
 | `--detach` | - | `daemon` only: continue in the background |
 
-Sequence and Parallel modes and their intervals are configured in the GUI.
-Parallel mode clicks every point once per round with a minimal gap, then waits
-for the round interval. It needs at least two points.
+Sequence mode and its interval are configured in the GUI.
 
 ## GUI and themes
 
-The window has four tabs: **Clicks**, **Mode**, **Hotkeys** and **System**.
+The GUI has two layouts. **Simple** keeps only Start/Stop, the status indicator,
+the mouse button and the CPS slider on one compact screen. **Advanced** is the
+full interface with the **Clicks**, **Mode**, **Hotkeys** and **System** tabs.
+The Simple/Advanced toggle is always visible in the top bar, and the choice is
+saved in `gui.toml`.
+
+<p align="center">
+  <img src="docs/gui-simple.png" alt="V-AutoClicker Simple mode" width="380">
+</p>
+
 Settings apply live, including while clicking.
 
 Available themes:

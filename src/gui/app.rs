@@ -28,6 +28,8 @@ const START_GUARD: Duration = Duration::from_millis(1500);
 const CONTENT_WIDTH: f32 = 424.0;
 const WINDOW_SIZE: [f32; 2] = [460.0, 560.0];
 const MIN_WINDOW_SIZE: [f32; 2] = [420.0, 520.0];
+const SIMPLE_WINDOW_SIZE: [f32; 2] = [380.0, 320.0];
+const SIMPLE_MIN_WINDOW_SIZE: [f32; 2] = [360.0, 300.0];
 const LABEL_WIDTH: f32 = 124.0;
 const MIN_AUTO_SCALE: f32 = 0.75;
 const MAX_AUTO_SCALE: f32 = 1.0;
@@ -179,6 +181,7 @@ pub struct GuiApp {
     language: Language,
     lang: Lang,
     applied_scale: Option<f32>,
+    simple_mode: bool,
     minimize_to_tray: bool,
     #[cfg_attr(not(windows), allow(dead_code))]
     start_hidden: bool,
@@ -256,6 +259,7 @@ impl GuiApp {
             language: config.language,
             lang,
             applied_scale: None,
+            simple_mode: config.simple_mode,
             minimize_to_tray: config.minimize_to_tray,
             start_hidden,
             #[cfg(windows)]
@@ -671,6 +675,7 @@ impl GuiApp {
                 hold_hotkey: self.hold_hotkey.clone(),
                 theme: self.theme,
                 language: self.language,
+                simple_mode: self.simple_mode,
                 minimize_to_tray: self.minimize_to_tray,
             })
     }
@@ -729,7 +734,8 @@ impl GuiApp {
         let Some(monitor) = ctx.input(|input| input.viewport().monitor_size) else {
             return;
         };
-        let scale = auto_scale_for(monitor, ctx.zoom_factor());
+        let size = window_size(self.simple_mode);
+        let scale = auto_scale_for(monitor, ctx.zoom_factor(), size);
 
         if (scale - ctx.zoom_factor()).abs() > 0.001 {
             ctx.set_zoom_factor(scale);
@@ -737,18 +743,40 @@ impl GuiApp {
 
         // The zoom factor changes how many winit logical pixels one egui point
         // occupies. Scale the outer window as well so the layout still gets
-        // its designed 460x560 points after zooming.
+        // its designed points after zooming.
         if self.applied_scale != Some(scale) {
             self.applied_scale = Some(scale);
+            let min = min_window_size(self.simple_mode);
             ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(Vec2::new(
-                MIN_WINDOW_SIZE[0] * scale,
-                MIN_WINDOW_SIZE[1] * scale,
+                min[0] * scale,
+                min[1] * scale,
             )));
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(
-                WINDOW_SIZE[0] * scale,
-                WINDOW_SIZE[1] * scale,
+                size[0] * scale,
+                size[1] * scale,
             )));
         }
+    }
+
+    fn set_simple_mode(&mut self, ctx: &egui::Context, simple: bool) {
+        if self.simple_mode == simple {
+            return;
+        }
+
+        self.simple_mode = simple;
+        self.save_config();
+
+        let scale = ctx.zoom_factor();
+        let size = window_size(simple);
+        let min = min_window_size(simple);
+        ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(Vec2::new(
+            min[0] * scale,
+            min[1] * scale,
+        )));
+        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(
+            size[0] * scale,
+            size[1] * scale,
+        )));
     }
 
     fn start_pipette(&mut self, target: PipetteTarget) {
@@ -1079,6 +1107,8 @@ impl GuiApp {
     }
 
     fn draw_topbar(&mut self, ui: &mut Ui) {
+        let mut toggle_mode = false;
+
         ui.horizontal(|ui| {
             let (mark, _) = ui.allocate_exact_size(Vec2::splat(7.0), Sense::hover());
             ui.painter()
@@ -1091,6 +1121,18 @@ impl GuiApp {
             );
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                let toggle = if self.simple_mode {
+                    Key::ModeAdvanced
+                } else {
+                    Key::ModeSimple
+                };
+                if widgets::text_button(ui, self.t(toggle), theme::muted(), theme::accent())
+                    .clicked()
+                {
+                    toggle_mode = true;
+                }
+
+                ui.add_space(6.0);
                 let (label, color, pulse) = self.status_palette();
                 let response = widgets::status_badge(ui, label, color, pulse);
                 if let Some(reason) = &self.offline_reason {
@@ -1098,6 +1140,54 @@ impl GuiApp {
                 }
             });
         });
+
+        if toggle_mode {
+            let simple = !self.simple_mode;
+            self.set_simple_mode(ui.ctx(), simple);
+        }
+    }
+
+    fn draw_simple_body(&mut self, ui: &mut Ui) {
+        self.draw_hero(ui);
+        self.draw_notice(ui);
+        ui.add_space(3.0);
+        theme::rule(ui);
+
+        let mut draft = self.settings;
+        let mut changed = false;
+
+        changed |= compact_choice_row(ui, self.t(Key::RowButton), self.t(Key::HintButton), |ui| {
+            widgets::segmented(
+                ui,
+                "simple_mouse_button",
+                &mut draft.button,
+                &[
+                    (Button::Left, self.t(Key::ButtonLeft)),
+                    (Button::Right, self.t(Key::ButtonRight)),
+                    (Button::Middle, self.t(Key::ButtonMiddle)),
+                ],
+            )
+        });
+
+        theme::rule(ui);
+        changed |= compact_slider_row(
+            ui,
+            self.t(Key::RowSpeed),
+            self.t(Key::HintSpeed),
+            &mut draft.cps,
+            SliderSpec {
+                range: 0.2..=1000.0,
+                logarithmic: true,
+                step: 0.1,
+                decimals: 1,
+                suffix: "CPS",
+            },
+        );
+
+        if changed {
+            self.settings = draft;
+            self.mark_dirty();
+        }
     }
 
     fn stopped_hint(&self) -> &'static str {
@@ -1159,11 +1249,6 @@ impl GuiApp {
             } else if self.settings.mode == ClickMode::Sequence {
                 self.fill(
                     Key::HeroSequenceClicks,
-                    &[self.settings.point_count().to_string()],
-                )
-            } else if self.settings.mode == ClickMode::Parallel {
-                self.fill(
-                    Key::HeroParallelClicks,
                     &[self.settings.point_count().to_string()],
                 )
             } else if self.settings.target.is_some() {
@@ -1336,16 +1421,11 @@ impl GuiApp {
         let mut draft = self.settings;
         let mut changed = false;
 
-        if matches!(draft.mode, ClickMode::Sequence | ClickMode::Parallel) {
-            let hint = if draft.mode == ClickMode::Parallel {
-                Key::ParallelSpeedHint
-            } else {
-                Key::SequenceSpeedHint
-            };
+        if draft.mode == ClickMode::Sequence {
             ui.add_space(2.0);
             ui.add(
                 egui::Label::new(
-                    RichText::new(self.t(hint))
+                    RichText::new(self.t(Key::SequenceSpeedHint))
                         .font(theme::sans(10.0))
                         .color(theme::dim()),
                 )
@@ -1445,7 +1525,6 @@ impl GuiApp {
 
         let period_ms = match draft.mode {
             ClickMode::Sequence => draft.point_interval_ms,
-            ClickMode::Parallel => draft.point_interval_ms / draft.point_count().max(1) as f64,
             ClickMode::Cursor | ClickMode::Point => 1000.0 / draft.cps.max(0.2),
         };
         let effective_hold = draft.hold_ms.min((period_ms - 0.2).max(0.1));
@@ -1489,13 +1568,13 @@ impl GuiApp {
         let mut mode_changed = false;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
-            let _ = row_label(ui, self.t(Key::RowTarget), self.t(Key::HintTarget), 47.0);
+            let _ = row_label(ui, self.t(Key::RowTarget), self.t(Key::HintTarget), 24.0);
 
             ui.allocate_ui_with_layout(
-                Vec2::new(ui.available_width(), 47.0),
+                Vec2::new(ui.available_width(), 24.0),
                 Layout::top_down(Align::Min),
                 |ui| {
-                    mode_changed = widgets::segmented_grid2(
+                    mode_changed = widgets::segmented(
                         ui,
                         "click_mode",
                         &mut mode,
@@ -1503,7 +1582,6 @@ impl GuiApp {
                             (ClickMode::Cursor, self.t(Key::TargetCursor)),
                             (ClickMode::Point, self.t(Key::TargetPoint)),
                             (ClickMode::Sequence, self.t(Key::TargetSequence)),
-                            (ClickMode::Parallel, self.t(Key::TargetParallel)),
                         ],
                     );
                 },
@@ -1514,7 +1592,7 @@ impl GuiApp {
                 ClickMode::Point if draft.target.is_none() => {
                     draft.target = crate::backend::cursor_position().ok();
                 }
-                ClickMode::Sequence | ClickMode::Parallel if draft.point_count() == 0 => {
+                ClickMode::Sequence if draft.point_count() == 0 => {
                     // Leave the list empty: the user adds points with the
                     // eyedropper, and readiness asks for two before starting.
                 }
@@ -1544,17 +1622,12 @@ impl GuiApp {
             changed = true;
         }
 
-        if matches!(draft.mode, ClickMode::Sequence | ClickMode::Parallel) {
-            let (interval_row, interval_hint) = if draft.mode == ClickMode::Parallel {
-                (Key::RowRoundInterval, Key::HintRoundInterval)
-            } else {
-                (Key::RowInterval, Key::HintInterval)
-            };
+        if draft.mode == ClickMode::Sequence {
             theme::rule(ui);
             changed |= compact_slider_row(
                 ui,
-                self.t(interval_row),
-                self.t(interval_hint),
+                self.t(Key::RowInterval),
+                self.t(Key::HintInterval),
                 &mut draft.point_interval_ms,
                 SliderSpec {
                     range: 1.0..=MAX_POINT_INTERVAL_MS as f64,
@@ -1566,14 +1639,9 @@ impl GuiApp {
             );
 
             theme::rule(ui);
-            let points_hint = if draft.mode == ClickMode::Parallel {
-                Key::HintParallelPoints
-            } else {
-                Key::HintPoints
-            };
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
-                let _ = row_label(ui, self.t(Key::RowPoints), self.t(points_hint), 22.0);
+                let _ = row_label(ui, self.t(Key::RowPoints), self.t(Key::HintPoints), 22.0);
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let enabled = draft.point_count() < MAX_POINTS;
@@ -2381,50 +2449,57 @@ impl egui_software_backend::App for GuiApp {
             )
             .show_inside(ui, |ui| {
                 #[cfg(not(windows))]
-                egui::Panel::bottom("daemon_footer")
-                    .frame(
-                        Frame::new()
-                            .fill(theme::bg())
-                            .inner_margin(Margin::symmetric(0, 4)),
-                    )
-                    .show_separator_line(false)
-                    .show_inside(ui, |ui| {
-                        ui.vertical_centered(|ui| {
-                            ui.set_max_width(ui.available_width().min(CONTENT_WIDTH));
-                            theme::rule(ui);
-                            ui.add_space(3.0);
-                            self.draw_footer(ui);
+                if !self.simple_mode {
+                    egui::Panel::bottom("daemon_footer")
+                        .frame(
+                            Frame::new()
+                                .fill(theme::bg())
+                                .inner_margin(Margin::symmetric(0, 4)),
+                        )
+                        .show_separator_line(false)
+                        .show_inside(ui, |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.set_max_width(ui.available_width().min(CONTENT_WIDTH));
+                                theme::rule(ui);
+                                ui.add_space(3.0);
+                                self.draw_footer(ui);
+                            });
                         });
-                    });
+                }
 
                 ui.vertical_centered(|ui| {
                     ui.set_max_width(ui.available_width().min(CONTENT_WIDTH));
                     self.draw_topbar(ui);
                     ui.add_space(4.0);
                     theme::rule(ui);
-                    self.draw_hero(ui);
-                    self.draw_metrics(ui);
-                    ui.add_space(2.0);
-                    self.draw_notice(ui);
-                    ui.add_space(3.0);
-                    self.draw_tabs(ui);
-                    ui.add_space(3.0);
 
-                    egui::ScrollArea::vertical()
-                        .id_salt(("tab_scroll", self.tab))
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| {
-                            ui.allocate_ui_with_layout(
-                                Vec2::new(ui.available_width(), ui.available_height()),
-                                Layout::top_down(Align::LEFT),
-                                |ui| match self.tab {
-                                    Tab::Clicks => self.draw_clicks_tab(ui),
-                                    Tab::Mode => self.draw_mode_tab(ui),
-                                    Tab::Hotkeys => self.draw_hotkeys_tab(ui),
-                                    Tab::System => self.draw_system_tab(ui),
-                                },
-                            );
-                        });
+                    if self.simple_mode {
+                        self.draw_simple_body(ui);
+                    } else {
+                        self.draw_hero(ui);
+                        self.draw_metrics(ui);
+                        ui.add_space(2.0);
+                        self.draw_notice(ui);
+                        ui.add_space(3.0);
+                        self.draw_tabs(ui);
+                        ui.add_space(3.0);
+
+                        egui::ScrollArea::vertical()
+                            .id_salt(("tab_scroll", self.tab))
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
+                                ui.allocate_ui_with_layout(
+                                    Vec2::new(ui.available_width(), ui.available_height()),
+                                    Layout::top_down(Align::LEFT),
+                                    |ui| match self.tab {
+                                        Tab::Clicks => self.draw_clicks_tab(ui),
+                                        Tab::Mode => self.draw_mode_tab(ui),
+                                        Tab::Hotkeys => self.draw_hotkeys_tab(ui),
+                                        Tab::System => self.draw_system_tab(ui),
+                                    },
+                                );
+                            });
+                    }
                 });
             });
 
@@ -2457,14 +2532,17 @@ impl Drop for GuiApp {
 
 pub fn run(start_hidden: bool) -> Result<(), Box<dyn std::error::Error>> {
     // A hidden start only makes sense together with a tray icon; the config is
-    // read again by the app, but the visibility has to be known before the
-    // window is created.
-    let start_hidden = start_hidden && cfg!(windows) && config::load().config.minimize_to_tray;
+    // read again by the app, but the visibility and the initial layout have to
+    // be known before the window is created.
+    let loaded = config::load();
+    let start_hidden = start_hidden && cfg!(windows) && loaded.config.minimize_to_tray;
+    let window = window_size(loaded.config.simple_mode);
+    let min_window = min_window_size(loaded.config.simple_mode);
 
     let mut viewport = egui::ViewportBuilder::default()
         .with_app_id("v-autoclicker")
-        .with_inner_size(WINDOW_SIZE)
-        .with_min_inner_size(MIN_WINDOW_SIZE)
+        .with_inner_size(window)
+        .with_min_inner_size(min_window)
         .with_title("V-AutoClicker")
         .with_visible(!start_hidden);
 
@@ -2499,7 +2577,23 @@ fn load_icon() -> Option<egui::IconData> {
     })
 }
 
-fn auto_scale_for(monitor_size: Vec2, zoom_factor: f32) -> f32 {
+fn window_size(simple: bool) -> [f32; 2] {
+    if simple {
+        SIMPLE_WINDOW_SIZE
+    } else {
+        WINDOW_SIZE
+    }
+}
+
+fn min_window_size(simple: bool) -> [f32; 2] {
+    if simple {
+        SIMPLE_MIN_WINDOW_SIZE
+    } else {
+        MIN_WINDOW_SIZE
+    }
+}
+
+fn auto_scale_for(monitor_size: Vec2, zoom_factor: f32, window: [f32; 2]) -> f32 {
     // `monitor_size` is reported in egui points at the current zoom level.
     // Convert it back to the unscaled logical size so the result does not
     // depend on the scale we already applied.
@@ -2508,8 +2602,8 @@ fn auto_scale_for(monitor_size: Vec2, zoom_factor: f32) -> f32 {
         return MAX_AUTO_SCALE;
     }
 
-    let fit = ((logical.x - SCREEN_MARGIN_X) / WINDOW_SIZE[0])
-        .min((logical.y - SCREEN_MARGIN_Y) / WINDOW_SIZE[1])
+    let fit = ((logical.x - SCREEN_MARGIN_X) / window[0])
+        .min((logical.y - SCREEN_MARGIN_Y) / window[1])
         .min(MAX_AUTO_SCALE);
     fit.clamp(MIN_AUTO_SCALE, MAX_AUTO_SCALE)
 }
@@ -2737,7 +2831,7 @@ mod tests {
     use super::*;
 
     fn scale(monitor: Vec2) -> f32 {
-        auto_scale_for(monitor, 1.0)
+        auto_scale_for(monitor, 1.0, WINDOW_SIZE)
     }
 
     #[test]
@@ -2751,11 +2845,17 @@ mod tests {
     #[test]
     fn automatic_scale_is_stable_after_zooming() {
         let unscaled = Vec2::new(910.0, 512.0);
-        let first = auto_scale_for(unscaled, 1.0);
+        let first = auto_scale_for(unscaled, 1.0, WINDOW_SIZE);
         assert!((first - 0.75).abs() < 0.001);
 
         // At 75% zoom the viewport reports the monitor in smaller points.
         let reported = unscaled / first;
-        assert!((auto_scale_for(reported, first) - first).abs() < 0.001);
+        assert!((auto_scale_for(reported, first, WINDOW_SIZE) - first).abs() < 0.001);
+    }
+
+    #[test]
+    fn simple_window_uses_its_own_scale() {
+        let monitor = Vec2::new(500.0, 400.0);
+        assert!((auto_scale_for(monitor, 1.0, SIMPLE_WINDOW_SIZE) - 0.95).abs() < 0.001);
     }
 }

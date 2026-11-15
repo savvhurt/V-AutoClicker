@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail};
 
-pub const PROTOCOL: u32 = 5;
+pub const PROTOCOL: u32 = 6;
 pub const MAX_LIMIT: u64 = 1_000_000_000;
 pub const MAX_DELAY_MS: f64 = 10_000.0;
 pub const MAX_MULTI_CLICK: u8 = 3;
@@ -57,7 +57,6 @@ pub enum ClickMode {
     Cursor,
     Point,
     Sequence,
-    Parallel,
 }
 
 impl ClickMode {
@@ -66,7 +65,6 @@ impl ClickMode {
             Self::Cursor => "cursor",
             Self::Point => "point",
             Self::Sequence => "sequence",
-            Self::Parallel => "parallel",
         }
     }
 
@@ -75,7 +73,6 @@ impl ClickMode {
             "cursor" => Some(Self::Cursor),
             "point" => Some(Self::Point),
             "sequence" | "points" | "multi-point" => Some(Self::Sequence),
-            "parallel" | "parallel-points" | "parallel-multi-point" => Some(Self::Parallel),
             _ => None,
         }
     }
@@ -271,12 +268,6 @@ impl Settings {
                 }
                 Ok(())
             }
-            ClickMode::Parallel => {
-                if self.point_count() < 2 {
-                    bail!("parallel mode requires at least two points");
-                }
-                Ok(())
-            }
         }
     }
 
@@ -308,7 +299,7 @@ impl Settings {
                     wire.push_str(&format!(" {} {}", target.x, target.y));
                 }
             }
-            ClickMode::Sequence | ClickMode::Parallel => {
+            ClickMode::Sequence => {
                 wire.push_str(&format!(
                     " {} {}",
                     format_number(self.point_interval_ms()),
@@ -1085,17 +1076,6 @@ mod tests {
             sequence.to_wire_command("ON"),
             "ON 125 left 10 0 0 0 1 sequence 250 2 1 2 -3 4"
         );
-
-        let parallel = base
-            .with_mode(ClickMode::Parallel)
-            .with_points(&[Point::new(1, 2), Point::new(-3, 4)])
-            .unwrap()
-            .with_point_interval_ms(250)
-            .unwrap();
-        assert_eq!(
-            parallel.to_wire_command("ON"),
-            "ON 125 left 10 0 0 0 1 parallel 250 2 1 2 -3 4"
-        );
     }
 
     #[test]
@@ -1153,23 +1133,6 @@ mod tests {
         );
         assert!(
             sequence
-                .with_points(&[Point::new(1, 2), Point::new(3, 4)])
-                .unwrap()
-                .readiness()
-                .is_ok()
-        );
-
-        let parallel = Settings::default().with_mode(ClickMode::Parallel);
-        assert!(parallel.readiness().is_err());
-        assert!(
-            parallel
-                .with_points(&[Point::new(1, 2)])
-                .unwrap()
-                .readiness()
-                .is_err()
-        );
-        assert!(
-            parallel
                 .with_points(&[Point::new(1, 2), Point::new(3, 4)])
                 .unwrap()
                 .readiness()
@@ -1277,42 +1240,6 @@ mod tests {
 
         assert_eq!(parsed, status);
         assert_eq!(parsed.settings.point_count(), 3);
-        assert_eq!(parsed.settings.point_at(1), Some(Point::new(-30, 40)));
-    }
-
-    #[test]
-    fn status_wire_round_trips_parallel_mode() {
-        let settings = Settings::new(123.456, Button::Middle, 7.25, 33.5)
-            .unwrap()
-            .with_mode(ClickMode::Parallel)
-            .with_points(&[Point::new(10, 20), Point::new(-30, 40)])
-            .unwrap()
-            .with_point_interval_ms(275)
-            .unwrap();
-        let status = Status {
-            protocol: PROTOCOL,
-            enabled: true,
-            settings,
-            actual_cps: 99.9,
-            clicks: 42,
-            session_clicks: 17,
-            starting: true,
-            delay_left_ms: 123,
-            stop_reason: Some(StopReason::Limit),
-            hotkey: "ctrl+alt+c".to_string(),
-            hotkey_active: "ctrl+shift+f8".to_string(),
-            hold_hotkey: "f9".to_string(),
-            hold_hotkey_active: "f9".to_string(),
-            hold_active: true,
-            hotkey_paused: false,
-            hotkey_error: None,
-            last_error: None,
-        };
-
-        let parsed = Status::from_wire(&status.to_wire()).unwrap();
-
-        assert_eq!(parsed, status);
-        assert_eq!(parsed.settings.mode, ClickMode::Parallel);
         assert_eq!(parsed.settings.point_at(1), Some(Point::new(-30, 40)));
     }
 

@@ -119,6 +119,7 @@ pub struct Config {
     pub hold_hotkey: String,
     pub theme: Theme,
     pub language: Language,
+    pub simple_mode: bool,
     pub minimize_to_tray: bool,
 }
 
@@ -178,6 +179,8 @@ struct PersistedSettings {
     #[serde(default = "default_language")]
     language: String,
     #[serde(default)]
+    simple_mode: bool,
+    #[serde(default)]
     minimize_to_tray: bool,
 }
 
@@ -205,6 +208,7 @@ impl PersistedSettings {
             hold_hotkey: config.hold_hotkey.clone(),
             theme: config.theme.as_str().to_string(),
             language: config.language.as_str().to_string(),
+            simple_mode: config.simple_mode,
             minimize_to_tray: config.minimize_to_tray,
         }
     }
@@ -237,6 +241,7 @@ pub fn load() -> Loaded {
         hold_hotkey: String::new(),
         theme: Theme::Paper,
         language: Language::Auto,
+        simple_mode: false,
         minimize_to_tray: false,
     };
 
@@ -283,6 +288,10 @@ pub fn load() -> Loaded {
     };
 
     let mut warnings = Vec::new();
+
+    if legacy_parallel_mode(&persisted.mode) {
+        warnings.push("Parallel mode was removed. Using Sequence instead.".to_string());
+    }
 
     let settings = match parse_settings(&persisted) {
         Ok(settings) => settings,
@@ -340,6 +349,7 @@ pub fn load() -> Loaded {
         hold_hotkey,
         theme,
         language,
+        simple_mode: persisted.simple_mode,
         minimize_to_tray: persisted.minimize_to_tray,
     };
 
@@ -349,6 +359,13 @@ pub fn load() -> Loaded {
     }
 }
 
+fn legacy_parallel_mode(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "parallel" | "parallel-points" | "parallel-multi-point"
+    )
+}
+
 fn parse_settings(persisted: &PersistedSettings) -> Result<Settings> {
     let mode = if persisted.mode.trim().is_empty() {
         if persisted.target.is_some() {
@@ -356,6 +373,8 @@ fn parse_settings(persisted: &PersistedSettings) -> Result<Settings> {
         } else {
             ClickMode::Cursor
         }
+    } else if legacy_parallel_mode(&persisted.mode) {
+        ClickMode::Sequence
     } else {
         ClickMode::parse(&persisted.mode)
             .ok_or_else(|| anyhow::anyhow!("unknown mode `{}`", persisted.mode))?
@@ -475,6 +494,7 @@ mod tests {
             hold_hotkey: "alt+space".to_string(),
             theme: Theme::Graphite,
             language: Language::De,
+            simple_mode: true,
             minimize_to_tray: true,
         }
     }
@@ -493,6 +513,7 @@ mod tests {
         assert_eq!(parsed.mode, "sequence");
         assert_eq!(parsed.points.len(), 2);
         assert_eq!(parsed.point_interval_ms, 175);
+        assert!(parsed.simple_mode);
         assert!(parsed.minimize_to_tray);
         assert!(!text.contains("profiles"));
         assert!(!text.contains("active_profile"));
@@ -510,14 +531,31 @@ mod tests {
 
     #[test]
     fn missing_new_fields_use_defaults() {
-        let settings =
-            parse("cps = 50\nbutton = \"left\"\nhold_ms = 10\njitter_pct = 0\n").unwrap();
+        let text = "cps = 50\nbutton = \"left\"\nhold_ms = 10\njitter_pct = 0\n";
+        let settings = parse(text).unwrap();
         assert_eq!(settings.limit, 0);
         assert_eq!(settings.delay_ms(), 0.0);
         assert_eq!(settings.multi_click, 1);
         assert_eq!(settings.mode, ClickMode::Cursor);
         assert_eq!(settings.target, None);
         assert_eq!(settings.point_count(), 0);
+
+        let persisted: PersistedSettings = toml::from_str(text).unwrap();
+        assert!(!persisted.simple_mode);
+    }
+
+    #[test]
+    fn legacy_parallel_mode_becomes_sequence() {
+        let text = "cps = 50\nbutton = \"left\"\nhold_ms = 10\njitter_pct = 0\n\
+                    mode = \"parallel\"\npoint_interval_ms = 150\n\
+                    points = [{ x = 1, y = 2 }, { x = 3, y = 4 }]\n";
+        let settings = parse(text).unwrap();
+
+        assert_eq!(settings.mode, ClickMode::Sequence);
+        assert_eq!(settings.point_count(), 2);
+        assert_eq!(settings.point_at(0), Some(Point::new(1, 2)));
+        assert_eq!(settings.point_at(1), Some(Point::new(3, 4)));
+        assert!((settings.point_interval_ms() - 150.0).abs() < 1e-9);
     }
 
     #[test]

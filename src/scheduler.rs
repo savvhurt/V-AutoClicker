@@ -58,7 +58,7 @@ fn click_series(shared: &SharedState, backend: &mut dyn Backend, initial: Snapsh
 
         let settings = snapshot.settings;
         let period = jittered_period(settings, rng);
-        let hold = mode_hold(settings, period);
+        let hold = clamp_hold(settings.hold, period);
 
         if !sleep_until(deadline, shared, initial.version) {
             break;
@@ -90,7 +90,6 @@ fn click_series(shared: &SharedState, backend: &mut dyn Backend, initial: Snapsh
                 }
                 click_burst(shared, backend, settings, hold, initial.version)
             }
-            ClickMode::Parallel => parallel_round(shared, backend, settings, hold, initial.version),
         };
 
         match outcome {
@@ -150,36 +149,6 @@ fn click_burst(
     Burst::Completed
 }
 
-/// Click every point once with a minimal gap, then let the caller pause for the
-/// round interval. A limit can stop the round after any point.
-fn parallel_round(
-    shared: &SharedState,
-    backend: &mut dyn Backend,
-    settings: Settings,
-    hold: Duration,
-    version: u64,
-) -> Burst {
-    let count = settings.point_count();
-    if count == 0 {
-        shared.set_error("parallel mode has no points".to_string());
-        shared.off();
-        return Burst::Interrupted;
-    }
-
-    for index in 0..count {
-        if !move_to_target(shared, backend, settings.point_at(index)) {
-            return Burst::Interrupted;
-        }
-
-        match click_burst(shared, backend, settings, hold, version) {
-            Burst::Completed => {}
-            other => return other,
-        }
-    }
-
-    Burst::Completed
-}
-
 fn move_to_target(shared: &SharedState, backend: &mut dyn Backend, target: Option<Point>) -> bool {
     let Some(target) = target else {
         return true;
@@ -202,22 +171,10 @@ fn move_to_target(shared: &SharedState, backend: &mut dyn Backend, target: Optio
 
 fn jittered_period(settings: Settings, rng: &mut Rng) -> Duration {
     let base = match settings.mode {
-        ClickMode::Sequence | ClickMode::Parallel => settings.point_interval,
+        ClickMode::Sequence => settings.point_interval,
         ClickMode::Cursor | ClickMode::Point => Duration::from_secs_f64(1.0 / settings.cps),
     };
     jittered_interval(base, settings.jitter_pct, rng)
-}
-
-fn mode_hold(settings: Settings, period: Duration) -> Duration {
-    if settings.mode != ClickMode::Parallel {
-        return clamp_hold(settings.hold, period);
-    }
-
-    // Spread the round interval across the points so a round can finish
-    // inside its budget. When the round still overruns, the next one starts
-    // immediately.
-    let budget = period / settings.point_count().max(1) as u32;
-    clamp_hold(settings.hold, budget.max(MIN_HOLD))
 }
 
 fn jittered_interval(base: Duration, jitter_pct: f64, rng: &mut Rng) -> Duration {
@@ -687,139 +644,6 @@ mod tests {
 
         assert_eq!(presses.load(Ordering::SeqCst), 2);
         assert!(started.elapsed() >= Duration::from_millis(230));
-
-        shared.quit();
-        handle.join().unwrap();
-    }
-
-    #[test]
-    fn parallel_visits_every_point_each_round() {
-        let points = [Point::new(10, 20), Point::new(30, 40), Point::new(-5, -6)];
-        let settings = Settings::new(50.0, Button::Left, 0.2, 0.0)
-            .unwrap()
-            .with_mode(ClickMode::Parallel)
-            .with_points(&points)
-            .unwrap()
-            .with_point_interval_ms(20)
-            .unwrap()
-            .with_limit(6)
-            .unwrap();
-        let (shared, presses, releases, moves, handle) = spawn_clicker(settings);
-
-        let deadline = Instant::now() + Duration::from_secs(3);
-        while shared.status().enabled && Instant::now() < deadline {
-            thread::sleep(Duration::from_millis(5));
-        }
-
-        let status = shared.status();
-        assert_eq!(status.stop_reason, Some(StopReason::Limit));
-        assert_eq!(presses.load(Ordering::SeqCst), 6);
-        assert_eq!(releases.load(Ordering::SeqCst), 6);
-        assert_eq!(
-            *moves.lock().unwrap(),
-            vec![
-                points[0], points[1], points[2], points[0], points[1], points[2]
-            ]
-        );
-
-        shared.quit();
-        handle.join().unwrap();
-    }
-
-    #[test]
-    fn parallel_limit_stops_the_round_after_any_point() {
-        let points = [Point::new(1, 1), Point::new(2, 2), Point::new(3, 3)];
-        let settings = Settings::new(50.0, Button::Left, 0.2, 0.0)
-            .unwrap()
-            .with_mode(ClickMode::Parallel)
-            .with_points(&points)
-            .unwrap()
-            .with_point_interval_ms(20)
-            .unwrap()
-            .with_limit(2)
-            .unwrap();
-        let (shared, presses, releases, moves, handle) = spawn_clicker(settings);
-
-        let deadline = Instant::now() + Duration::from_secs(3);
-        while shared.status().enabled && Instant::now() < deadline {
-            thread::sleep(Duration::from_millis(5));
-        }
-
-        assert_eq!(shared.status().stop_reason, Some(StopReason::Limit));
-        assert_eq!(presses.load(Ordering::SeqCst), 2);
-        assert_eq!(releases.load(Ordering::SeqCst), 2);
-        assert_eq!(*moves.lock().unwrap(), vec![points[0], points[1]]);
-
-        shared.quit();
-        handle.join().unwrap();
-    }
-
-    #[test]
-    fn parallel_interval_sets_the_round_period() {
-        let settings = Settings::new(50.0, Button::Left, 0.2, 0.0)
-            .unwrap()
-            .with_mode(ClickMode::Parallel)
-            .with_points(&[Point::new(1, 1), Point::new(2, 2)])
-            .unwrap()
-            .with_point_interval_ms(250)
-            .unwrap()
-            .with_limit(4)
-            .unwrap();
-        let (shared, presses, _releases, _moves, handle) = spawn_clicker(settings);
-        let started = Instant::now();
-
-        let deadline = Instant::now() + Duration::from_secs(3);
-        while shared.status().enabled && Instant::now() < deadline {
-            thread::sleep(Duration::from_millis(5));
-        }
-
-        assert_eq!(presses.load(Ordering::SeqCst), 4);
-        assert!(started.elapsed() >= Duration::from_millis(230));
-
-        shared.quit();
-        handle.join().unwrap();
-    }
-
-    #[test]
-    fn parallel_hold_is_spread_across_the_points() {
-        let points = [
-            Point::new(1, 1),
-            Point::new(2, 2),
-            Point::new(3, 3),
-            Point::new(4, 4),
-        ];
-        let settings = Settings::new(50.0, Button::Left, 50.0, 0.0)
-            .unwrap()
-            .with_mode(ClickMode::Parallel)
-            .with_points(&points)
-            .unwrap();
-
-        let hold = mode_hold(settings, Duration::from_millis(100));
-        assert!(hold < Duration::from_millis(25));
-        assert!(hold >= MIN_HOLD);
-    }
-
-    #[test]
-    fn parallel_without_points_stops_with_an_error() {
-        let settings = Settings::new(50.0, Button::Left, 1.0, 0.0)
-            .unwrap()
-            .with_mode(ClickMode::Parallel);
-        let (shared, presses, _releases, _moves, handle) = spawn_clicker(settings);
-
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while shared.status().enabled && Instant::now() < deadline {
-            thread::sleep(Duration::from_millis(5));
-        }
-
-        assert_eq!(presses.load(Ordering::SeqCst), 0);
-        assert_eq!(shared.status().stop_reason, Some(StopReason::Manual));
-        assert!(
-            shared
-                .status()
-                .last_error
-                .as_deref()
-                .is_some_and(|error| error.contains("no points"))
-        );
 
         shared.quit();
         handle.join().unwrap();
