@@ -204,6 +204,18 @@ saved in `gui.toml`.
 
 Settings apply live, including while clicking.
 
+The window opens at 380×260 in Simple and 460×520 in Advanced (460×560 on
+Linux, where the daemon footer takes the extra row). A tiling compositor may
+override this: on **niri** the GUI is tiled by default, so the compact size only
+applies when the window floats. To keep it at the designed size, add:
+
+```kdl
+window-rule {
+    match app-id="v-autoclicker"
+    open-floating true
+}
+```
+
 Available themes:
 
 | Light | Dark |

@@ -26,10 +26,17 @@ const STATUS_STALE_AFTER: Duration = Duration::from_secs(3);
 const WORKER_RESTART_COOLDOWN: Duration = Duration::from_secs(10);
 const START_GUARD: Duration = Duration::from_millis(1500);
 const CONTENT_WIDTH: f32 = 424.0;
+// Windows has no daemon footer, so the advanced layout can be shorter there.
+#[cfg(windows)]
+const WINDOW_SIZE: [f32; 2] = [460.0, 520.0];
+#[cfg(not(windows))]
 const WINDOW_SIZE: [f32; 2] = [460.0, 560.0];
+#[cfg(windows)]
+const MIN_WINDOW_SIZE: [f32; 2] = [420.0, 480.0];
+#[cfg(not(windows))]
 const MIN_WINDOW_SIZE: [f32; 2] = [420.0, 520.0];
-const SIMPLE_WINDOW_SIZE: [f32; 2] = [380.0, 320.0];
-const SIMPLE_MIN_WINDOW_SIZE: [f32; 2] = [360.0, 300.0];
+const SIMPLE_WINDOW_SIZE: [f32; 2] = [380.0, 260.0];
+const SIMPLE_MIN_WINDOW_SIZE: [f32; 2] = [360.0, 250.0];
 const LABEL_WIDTH: f32 = 124.0;
 const MIN_AUTO_SCALE: f32 = 0.75;
 const MAX_AUTO_SCALE: f32 = 1.0;
@@ -2830,32 +2837,38 @@ fn settings_equivalent(left: &Settings, right: &Settings) -> bool {
 mod tests {
     use super::*;
 
-    fn scale(monitor: Vec2) -> f32 {
-        auto_scale_for(monitor, 1.0, WINDOW_SIZE)
+    fn scale(monitor: Vec2, window: [f32; 2]) -> f32 {
+        auto_scale_for(monitor, 1.0, window)
     }
 
     #[test]
     fn automatic_scale_fits_the_screen() {
-        assert!((scale(Vec2::new(1920.0, 1080.0)) - 1.0).abs() < 0.001);
-        assert!((scale(Vec2::new(1366.0, 768.0)) - 1.0).abs() < 0.001);
-        assert!((scale(Vec2::new(1092.0, 614.0)) - 0.925).abs() < 0.001);
-        assert!((scale(Vec2::new(910.0, 512.0)) - 0.75).abs() < 0.001);
+        let advanced = [460.0, 560.0];
+        assert!((scale(Vec2::new(1920.0, 1080.0), advanced) - 1.0).abs() < 0.001);
+        assert!((scale(Vec2::new(1366.0, 768.0), advanced) - 1.0).abs() < 0.001);
+        assert!((scale(Vec2::new(1092.0, 614.0), advanced) - 0.925).abs() < 0.001);
+        assert!((scale(Vec2::new(910.0, 512.0), advanced) - 0.75).abs() < 0.001);
+
+        // The shorter Windows layout needs less zoom on the same screen.
+        let compact = [460.0, 520.0];
+        assert!((scale(Vec2::new(1092.0, 614.0), compact) - 0.996).abs() < 0.001);
+        assert!((scale(Vec2::new(910.0, 512.0), compact) - 0.8).abs() < 0.001);
     }
 
     #[test]
     fn automatic_scale_is_stable_after_zooming() {
         let unscaled = Vec2::new(910.0, 512.0);
         let first = auto_scale_for(unscaled, 1.0, WINDOW_SIZE);
-        assert!((first - 0.75).abs() < 0.001);
+        assert!((MIN_AUTO_SCALE..=MAX_AUTO_SCALE).contains(&first));
 
-        // At 75% zoom the viewport reports the monitor in smaller points.
+        // At the applied zoom the viewport reports the monitor in smaller points.
         let reported = unscaled / first;
         assert!((auto_scale_for(reported, first, WINDOW_SIZE) - first).abs() < 0.001);
     }
 
     #[test]
     fn simple_window_uses_its_own_scale() {
-        let monitor = Vec2::new(500.0, 400.0);
-        assert!((auto_scale_for(monitor, 1.0, SIMPLE_WINDOW_SIZE) - 0.95).abs() < 0.001);
+        let monitor = Vec2::new(400.0, 330.0);
+        assert!((auto_scale_for(monitor, 1.0, SIMPLE_WINDOW_SIZE) - 0.9).abs() < 0.001);
     }
 }
