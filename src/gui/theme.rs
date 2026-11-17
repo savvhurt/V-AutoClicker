@@ -354,6 +354,23 @@ pub fn rule(ui: &mut egui::Ui) {
     );
 }
 
+/// A soft rounded surface used to group related controls.
+pub fn card() -> egui::Frame {
+    egui::Frame::new()
+        .fill(panel())
+        .stroke(Stroke::new(1.0_f32, line_soft()))
+        .corner_radius(CornerRadius::same(12))
+        .inner_margin(Margin::symmetric(12, 8))
+}
+
+/// A tinted strip for the current status notice.
+pub fn notice_frame(tone: Color32) -> egui::Frame {
+    egui::Frame::new()
+        .fill(alpha(tone, if palette().dark { 18 } else { 12 }))
+        .corner_radius(CornerRadius::same(8))
+        .inner_margin(Margin::symmetric(9, 3))
+}
+
 fn install_fonts(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
 

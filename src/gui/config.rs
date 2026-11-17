@@ -120,6 +120,7 @@ pub struct Config {
     pub theme: Theme,
     pub language: Language,
     pub simple_mode: bool,
+    pub always_on_top: bool,
     pub minimize_to_tray: bool,
 }
 
@@ -181,6 +182,8 @@ struct PersistedSettings {
     #[serde(default)]
     simple_mode: bool,
     #[serde(default)]
+    always_on_top: bool,
+    #[serde(default)]
     minimize_to_tray: bool,
 }
 
@@ -209,6 +212,7 @@ impl PersistedSettings {
             theme: config.theme.as_str().to_string(),
             language: config.language.as_str().to_string(),
             simple_mode: config.simple_mode,
+            always_on_top: config.always_on_top,
             minimize_to_tray: config.minimize_to_tray,
         }
     }
@@ -242,6 +246,7 @@ pub fn load() -> Loaded {
         theme: Theme::Paper,
         language: Language::Auto,
         simple_mode: false,
+        always_on_top: false,
         minimize_to_tray: false,
     };
 
@@ -350,6 +355,7 @@ pub fn load() -> Loaded {
         theme,
         language,
         simple_mode: persisted.simple_mode,
+        always_on_top: persisted.always_on_top,
         minimize_to_tray: persisted.minimize_to_tray,
     };
 
@@ -495,6 +501,7 @@ mod tests {
             theme: Theme::Graphite,
             language: Language::De,
             simple_mode: true,
+            always_on_top: true,
             minimize_to_tray: true,
         }
     }
@@ -514,6 +521,7 @@ mod tests {
         assert_eq!(parsed.points.len(), 2);
         assert_eq!(parsed.point_interval_ms, 175);
         assert!(parsed.simple_mode);
+        assert!(parsed.always_on_top);
         assert!(parsed.minimize_to_tray);
         assert!(!text.contains("profiles"));
         assert!(!text.contains("active_profile"));
@@ -542,6 +550,7 @@ mod tests {
 
         let persisted: PersistedSettings = toml::from_str(text).unwrap();
         assert!(!persisted.simple_mode);
+        assert!(!persisted.always_on_top);
     }
 
     #[test]

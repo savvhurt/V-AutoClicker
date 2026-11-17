@@ -826,6 +826,22 @@ define_strings! {
         "El inicio automático solo está disponible en Linux y Windows.",
         "A inicialização automática está disponível apenas no Linux e Windows."
     ],
+    RowAlwaysOnTop: [
+        "Always on top",
+        "Поверх всех окон",
+        "Immer im Vordergrund",
+        "Toujours au premier plan",
+        "Siempre visible",
+        "Sempre visível"
+    ],
+    HintAlwaysOnTop: [
+        "Keep the window above other windows",
+        "Держать окно поверх остальных",
+        "Das Fenster über anderen Fenstern halten",
+        "Garder la fenêtre au-dessus des autres",
+        "Mantener la ventana sobre las demás",
+        "Manter a janela sobre as outras"
+    ],
     AutostartOn: [
         "Autostart enabled.",
         "Автозапуск включён.",

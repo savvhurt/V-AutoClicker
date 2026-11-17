@@ -39,6 +39,7 @@ Native input, three click modes, twelve themes, one small binary.
 - **Global hotkeys** on Windows, compositor bindings on Linux.
 - **Hold-to-click** on Windows with a second hotkey.
 - **Autostart** on both platforms, plus optional **minimize to tray** on Windows.
+- **Always on top** on Windows and X11, with a pin in the top bar.
 - **12 themes**, six interface languages and automatic DPI scaling.
 - **One binary**: no arguments opens the GUI, subcommands stay on the CLI.
 - Settings live in `gui.toml` and are saved automatically.
@@ -196,7 +197,12 @@ The GUI has two layouts. **Simple** keeps only Start/Stop, the status indicator,
 the mouse button and the CPS slider on one compact screen. **Advanced** is the
 full interface with the **Clicks**, **Mode**, **Hotkeys** and **System** tabs.
 The Simple/Advanced toggle is always visible in the top bar, and the choice is
-saved in `gui.toml`.
+saved in `gui.toml`. The pin next to the status badge toggles **Always on top**;
+the same switch is available in the **System** tab.
+
+Always on top is supported on **Windows** and **Linux/X11**. On Wayland the
+compositor owns window stacking (and niri has no always-on-top action), so the
+control is hidden there instead of silently doing nothing.
 
 <p align="center">
   <img src="docs/gui-simple.png" alt="V-AutoClicker Simple mode" width="380">
@@ -204,7 +210,7 @@ saved in `gui.toml`.
 
 Settings apply live, including while clicking.
 
-The window opens at 380×260 in Simple and 460×520 in Advanced (460×560 on
+The window opens at 380×260 in Simple and 460×560 in Advanced (460×600 on
 Linux, where the daemon footer takes the extra row). A tiling compositor may
 override this: on **niri** the GUI is tiled by default, so the compact size only
 applies when the window floats. To keep it at the designed size, add:

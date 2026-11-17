@@ -6,27 +6,88 @@ use egui::{
 use super::theme;
 
 pub const FIELD_WIDTH: f32 = 96.0;
-pub const FIELD_HEIGHT: f32 = 22.0;
+pub const FIELD_HEIGHT: f32 = 24.0;
 const FIELD_PADDING: f32 = 4.0;
+/// Fixed width for the unit label inside a numeric field. Reserving the same
+/// slot for `CPS`, `MS`, `%`, `X` and `Y` keeps every field box and slider end
+/// aligned instead of shifting with the suffix width.
+const SUFFIX_SLOT: f32 = 22.0;
+const INPUT_GAP: f32 = 4.0;
+const INPUT_WIDTH: f32 = FIELD_WIDTH + INPUT_GAP + SUFFIX_SLOT;
 
 pub fn status_badge(ui: &mut Ui, text: &str, dot: Color32, pulse: bool) -> Response {
     let text_color = if pulse { theme::text() } else { theme::muted() };
     let galley = ui
         .painter()
         .layout_no_wrap(text.to_owned(), theme::mono_medium(9.0), text_color);
-    let size = Vec2::new(galley.size().x + 16.0, 20.0);
+    let size = Vec2::new(galley.size().x + 24.0, 22.0);
     let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
 
-    let center = pos2(rect.left() + 3.0, rect.center().y);
     let painter = ui.painter();
+    painter.rect_filled(
+        rect,
+        CornerRadius::same(7),
+        theme::alpha(dot, if pulse { 22 } else { 10 }),
+    );
+
+    let center = pos2(rect.left() + 8.0, rect.center().y);
     if pulse {
-        painter.circle_filled(center, 5.0, theme::alpha(dot, 22));
+        painter.circle_filled(center, 5.0, theme::alpha(dot, 26));
     }
     painter.circle_filled(center, 2.4, dot);
     painter.galley(
-        pos2(rect.left() + 11.0, rect.center().y - galley.size().y * 0.5),
+        pos2(rect.left() + 15.0, rect.center().y - galley.size().y * 0.5),
         galley,
         text_color,
+    );
+
+    response
+}
+
+/// A small pin that toggles the always-on-top window level.
+pub fn pin_button(ui: &mut Ui, active: bool) -> Response {
+    let (rect, response) = ui.allocate_exact_size(Vec2::splat(26.0), Sense::click());
+    let response = response.on_hover_cursor(CursorIcon::PointingHand);
+    let hover =
+        ui.ctx()
+            .animate_bool_with_time(response.id.with("pin_hover"), response.hovered(), 0.16);
+
+    let painter = ui.painter();
+    if active || hover > 0.01 {
+        let alpha = if active {
+            30
+        } else {
+            (12.0 * hover).round() as u8
+        };
+        painter.rect_filled(
+            rect,
+            CornerRadius::same(7),
+            theme::alpha(theme::accent(), alpha),
+        );
+    }
+
+    let color = if active {
+        theme::accent()
+    } else if hover > 0.5 {
+        theme::text()
+    } else {
+        theme::muted()
+    };
+    let center = rect.center();
+    let head = center + vec2(0.0, -4.0);
+    painter.circle_filled(head, 2.8, color);
+    painter.add(egui::Shape::convex_polygon(
+        vec![
+            head + vec2(-2.6, 1.2),
+            head + vec2(2.6, 1.2),
+            center + vec2(0.0, 2.4),
+        ],
+        color,
+        Stroke::NONE,
+    ));
+    painter.line_segment(
+        [center + vec2(0.0, 2.0), center + vec2(0.0, 7.0)],
+        Stroke::new(1.4_f32, color),
     );
 
     response
@@ -330,17 +391,11 @@ fn paint_field_border(ui: &Ui, rect: Rect, hovered: bool, focused: bool) {
     );
 }
 
-fn suffix_width(ui: &Ui, suffix: &str) -> f32 {
-    ui.painter()
-        .layout_no_wrap(suffix.to_owned(), theme::mono_medium(9.0), theme::dim())
-        .size()
-        .x
-}
-
 /// Total width of a numeric field plus its unit label, so the slider row can
-/// reserve enough space without clipping the field.
-pub fn numeric_row_width(ui: &Ui, suffix: &str) -> f32 {
-    FIELD_WIDTH + suffix_width(ui, suffix) + 5.0
+/// reserve enough space without clipping the field. The suffix slot is fixed,
+/// which is what makes all slider tracks and field boxes line up.
+pub fn numeric_row_width() -> f32 {
+    INPUT_WIDTH
 }
 
 fn configure_field_child(ui: &mut Ui, rect: Rect) -> Ui {
@@ -364,26 +419,30 @@ fn configure_field_child(ui: &mut Ui, rect: Rect) -> Ui {
     child
 }
 
-fn add_field(
-    ui: &mut Ui,
-    suffix: &str,
-    value: impl egui::widgets::Widget,
-    item_spacing: f32,
-) -> bool {
-    ui.spacing_mut().item_spacing.x = item_spacing;
-    ui.label(
-        RichText::new(suffix)
-            .font(theme::mono_medium(9.0))
-            .color(theme::dim()),
-    );
-
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(FIELD_WIDTH, FIELD_HEIGHT), Sense::hover());
+fn add_field(ui: &mut Ui, suffix: &str, value: impl egui::widgets::Widget) -> bool {
+    // One rectangle for the whole input: value on the left, unit on the right.
+    // Its width never depends on the suffix, so every row shares the same
+    // right edge as the segmented controls.
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(INPUT_WIDTH, FIELD_HEIGHT), Sense::hover());
     paint_field_fill(ui, rect);
 
-    let mut child = configure_field_child(ui, rect);
+    let value_rect = Rect::from_min_size(rect.min, Vec2::new(FIELD_WIDTH, rect.height()));
+    let mut child = configure_field_child(ui, value_rect);
     let response = child.add_sized(
         Vec2::new(FIELD_WIDTH - 2.0 * FIELD_PADDING, FIELD_HEIGHT - 2.0),
         value,
+    );
+
+    let galley =
+        ui.painter()
+            .layout_no_wrap(suffix.to_owned(), theme::mono_medium(9.0), theme::dim());
+    ui.painter().galley(
+        pos2(
+            rect.right() - INPUT_GAP - galley.size().x,
+            rect.center().y - galley.size().y * 0.5,
+        ),
+        galley,
+        theme::dim(),
     );
 
     // Paint the border last so it stays crisp over the field content, and give
@@ -408,7 +467,6 @@ pub fn numeric_field(
             .range(range)
             .speed(speed)
             .max_decimals(decimals),
-        5.0,
     )
 }
 
@@ -426,7 +484,6 @@ pub fn integer_field(
             .range(range)
             .speed(speed)
             .max_decimals(0),
-        5.0,
     )
 }
 
@@ -436,7 +493,6 @@ pub fn coordinate_field(ui: &mut Ui, value: &mut i32, suffix: &str) -> bool {
         ui,
         suffix,
         egui::DragValue::new(value).speed(1.0).max_decimals(0),
-        4.0,
     )
 }
 
@@ -540,15 +596,22 @@ pub fn notice_line(ui: &mut Ui, tone: Color32, title: &str, text: &str) -> Respo
         );
 
         let width = ui.available_width().max(40.0);
-        let response = ui.add_sized(
-            Vec2::new(width, 18.0),
-            egui::Label::new(
-                RichText::new(text)
-                    .font(theme::sans(10.5))
-                    .color(theme::text()),
+        let response = ui
+            .allocate_ui_with_layout(
+                Vec2::new(width, 18.0),
+                Layout::left_to_right(Align::Center),
+                |ui| {
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(text)
+                                .font(theme::sans(10.5))
+                                .color(theme::text()),
+                        )
+                        .truncate(),
+                    )
+                },
             )
-            .truncate(),
-        );
+            .inner;
         response.on_hover_text(full)
     })
     .inner

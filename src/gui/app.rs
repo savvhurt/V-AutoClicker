@@ -28,9 +28,9 @@ const START_GUARD: Duration = Duration::from_millis(1500);
 const CONTENT_WIDTH: f32 = 424.0;
 // Windows has no daemon footer, so the advanced layout can be shorter there.
 #[cfg(windows)]
-const WINDOW_SIZE: [f32; 2] = [460.0, 520.0];
-#[cfg(not(windows))]
 const WINDOW_SIZE: [f32; 2] = [460.0, 560.0];
+#[cfg(not(windows))]
+const WINDOW_SIZE: [f32; 2] = [460.0, 600.0];
 #[cfg(windows)]
 const MIN_WINDOW_SIZE: [f32; 2] = [420.0, 480.0];
 #[cfg(not(windows))]
@@ -189,6 +189,7 @@ pub struct GuiApp {
     lang: Lang,
     applied_scale: Option<f32>,
     simple_mode: bool,
+    always_on_top: bool,
     minimize_to_tray: bool,
     #[cfg_attr(not(windows), allow(dead_code))]
     start_hidden: bool,
@@ -267,6 +268,9 @@ impl GuiApp {
             lang,
             applied_scale: None,
             simple_mode: config.simple_mode,
+            // Keep the saved preference on unsupported sessions (Wayland) so
+            // switching back to X11 or Windows restores it at startup.
+            always_on_top: config.always_on_top,
             minimize_to_tray: config.minimize_to_tray,
             start_hidden,
             #[cfg(windows)]
@@ -683,6 +687,7 @@ impl GuiApp {
                 theme: self.theme,
                 language: self.language,
                 simple_mode: self.simple_mode,
+                always_on_top: self.always_on_top,
                 minimize_to_tray: self.minimize_to_tray,
             })
     }
@@ -784,6 +789,20 @@ impl GuiApp {
             size[0] * scale,
             size[1] * scale,
         )));
+    }
+
+    fn set_always_on_top(&mut self, ctx: &egui::Context, enabled: bool) {
+        if self.always_on_top == enabled {
+            return;
+        }
+
+        self.always_on_top = enabled;
+        ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(if enabled {
+            egui::WindowLevel::AlwaysOnTop
+        } else {
+            egui::WindowLevel::Normal
+        }));
+        self.save_config();
     }
 
     fn start_pipette(&mut self, target: PipetteTarget) {
@@ -1115,6 +1134,7 @@ impl GuiApp {
 
     fn draw_topbar(&mut self, ui: &mut Ui) {
         let mut toggle_mode = false;
+        let mut toggle_pin = false;
 
         ui.horizontal(|ui| {
             let (mark, _) = ui.allocate_exact_size(Vec2::splat(7.0), Sense::hover());
@@ -1139,6 +1159,16 @@ impl GuiApp {
                     toggle_mode = true;
                 }
 
+                if always_on_top_supported() {
+                    ui.add_space(4.0);
+                    if widgets::pin_button(ui, self.always_on_top)
+                        .on_hover_text(self.t(Key::RowAlwaysOnTop))
+                        .clicked()
+                    {
+                        toggle_pin = true;
+                    }
+                }
+
                 ui.add_space(6.0);
                 let (label, color, pulse) = self.status_palette();
                 let response = widgets::status_badge(ui, label, color, pulse);
@@ -1152,49 +1182,65 @@ impl GuiApp {
             let simple = !self.simple_mode;
             self.set_simple_mode(ui.ctx(), simple);
         }
+        if toggle_pin {
+            let enabled = !self.always_on_top;
+            self.set_always_on_top(ui.ctx(), enabled);
+        }
     }
 
     fn draw_simple_body(&mut self, ui: &mut Ui) {
-        self.draw_hero(ui);
-        self.draw_notice(ui);
-        ui.add_space(3.0);
-        theme::rule(ui);
-
-        let mut draft = self.settings;
-        let mut changed = false;
-
-        changed |= compact_choice_row(ui, self.t(Key::RowButton), self.t(Key::HintButton), |ui| {
-            widgets::segmented(
-                ui,
-                "simple_mouse_button",
-                &mut draft.button,
-                &[
-                    (Button::Left, self.t(Key::ButtonLeft)),
-                    (Button::Right, self.t(Key::ButtonRight)),
-                    (Button::Middle, self.t(Key::ButtonMiddle)),
-                ],
-            )
+        theme::card().show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            self.draw_hero(ui);
         });
 
-        theme::rule(ui);
-        changed |= compact_slider_row(
-            ui,
-            self.t(Key::RowSpeed),
-            self.t(Key::HintSpeed),
-            &mut draft.cps,
-            SliderSpec {
-                range: 0.2..=1000.0,
-                logarithmic: true,
-                step: 0.1,
-                decimals: 1,
-                suffix: "CPS",
-            },
-        );
-
-        if changed {
-            self.settings = draft;
-            self.mark_dirty();
+        // The compact window keeps only notices that need attention; the idle
+        // "ready" strip would push the controls card out of 380x260.
+        if self.simple_notice_visible() {
+            ui.add_space(6.0);
+            self.draw_notice(ui);
         }
+        ui.add_space(8.0);
+
+        theme::card().show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            let mut draft = self.settings;
+            let mut changed = false;
+
+            changed |=
+                compact_choice_row(ui, self.t(Key::RowButton), self.t(Key::HintButton), |ui| {
+                    widgets::segmented(
+                        ui,
+                        "simple_mouse_button",
+                        &mut draft.button,
+                        &[
+                            (Button::Left, self.t(Key::ButtonLeft)),
+                            (Button::Right, self.t(Key::ButtonRight)),
+                            (Button::Middle, self.t(Key::ButtonMiddle)),
+                        ],
+                    )
+                });
+
+            theme::rule(ui);
+            changed |= compact_slider_row(
+                ui,
+                self.t(Key::RowSpeed),
+                self.t(Key::HintSpeed),
+                &mut draft.cps,
+                SliderSpec {
+                    range: 0.2..=1000.0,
+                    logarithmic: true,
+                    step: 0.1,
+                    decimals: 1,
+                    suffix: "CPS",
+                },
+            );
+
+            if changed {
+                self.settings = draft;
+                self.mark_dirty();
+            }
+        });
     }
 
     fn stopped_hint(&self) -> &'static str {
@@ -1276,11 +1322,10 @@ impl GuiApp {
             )
         };
 
-        ui.add_space(2.0);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
             let busy = pending.is_some() || self.start_guard.is_some();
-            let response = widgets::power_button(ui, active, busy, 68.0);
+            let response = widgets::power_button(ui, active, busy, 60.0);
             if response.clicked() && pending.is_none() {
                 if self.start_guard.is_some() {
                     self.cancel_start_guard();
@@ -1294,13 +1339,13 @@ impl GuiApp {
             ui.add_space(12.0);
             let width = ui.available_width();
             ui.allocate_ui_with_layout(
-                Vec2::new(width, 68.0),
+                Vec2::new(width, 60.0),
                 Layout::top_down(Align::LEFT),
                 |ui| {
-                    ui.add_space(4.0);
+                    ui.add_space(2.0);
                     ui.label(
                         RichText::new(title)
-                            .font(theme::sans_semibold(20.0))
+                            .font(theme::sans_semibold(19.0))
                             .color(theme::text()),
                     );
 
@@ -1316,12 +1361,12 @@ impl GuiApp {
                 },
             );
         });
-        ui.add_space(2.0);
     }
 
     fn draw_metrics(&self, ui: &mut Ui) {
-        theme::rule(ui);
         ui.add_space(2.0);
+        theme::rule(ui);
+        ui.add_space(4.0);
         ui.columns(2, |columns| {
             metric(
                 &mut columns[0],
@@ -1342,8 +1387,7 @@ impl GuiApp {
                 &limit,
             );
         });
-        ui.add_space(2.0);
-        theme::rule(ui);
+        ui.add_space(1.0);
     }
 
     fn notice_data(&self) -> (Color32, &'static str, String) {
@@ -1387,15 +1431,23 @@ impl GuiApp {
         )
     }
 
+    fn simple_notice_visible(&self) -> bool {
+        let (_, title, _) = self.notice_data();
+        title != self.t(Key::NoticeReady)
+    }
+
     fn draw_notice(&self, ui: &mut Ui) {
         let (tone, title, text) = self.notice_data();
-        ui.allocate_ui_with_layout(
-            Vec2::new(ui.available_width(), 20.0),
-            Layout::left_to_right(Align::Center),
-            |ui| {
-                widgets::notice_line(ui, tone, title, &text);
-            },
-        );
+        theme::notice_frame(tone).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.allocate_ui_with_layout(
+                Vec2::new(ui.available_width(), 20.0),
+                Layout::left_to_right(Align::Center),
+                |ui| {
+                    widgets::notice_line(ui, tone, title, &text);
+                },
+            );
+        });
     }
 
     fn draw_tabs(&mut self, ui: &mut Ui) {
@@ -1418,9 +1470,11 @@ impl GuiApp {
     }
 
     fn draw_clicks_tab(&mut self, ui: &mut Ui) {
-        // Six parameter rows plus the hint must fit the 420x520 minimum
-        // without scrolling, so use a tighter vertical rhythm there.
-        ui.spacing_mut().item_spacing.y = if ui.ctx().content_rect().height() < 540.0 {
+        // Six parameter rows plus the hint should fit without scrolling at the
+        // default window sizes. The card layout adds padding, so use the
+        // compact rhythm below 600 px and let only the absolute minimum
+        // 420x520 window scroll.
+        ui.spacing_mut().item_spacing.y = if ui.ctx().content_rect().height() < 600.0 {
             1.0
         } else {
             3.0
@@ -1560,7 +1614,7 @@ impl GuiApp {
     }
 
     fn draw_mode_tab(&mut self, ui: &mut Ui) {
-        ui.spacing_mut().item_spacing.y = if ui.ctx().content_rect().height() < 540.0 {
+        ui.spacing_mut().item_spacing.y = if ui.ctx().content_rect().height() < 600.0 {
             1.0
         } else {
             3.0
@@ -1844,7 +1898,7 @@ impl GuiApp {
     }
 
     fn draw_system_tab(&mut self, ui: &mut Ui) {
-        ui.spacing_mut().item_spacing.y = if ui.ctx().content_rect().height() < 540.0 {
+        ui.spacing_mut().item_spacing.y = if ui.ctx().content_rect().height() < 600.0 {
             1.0
         } else {
             3.0
@@ -1900,6 +1954,25 @@ impl GuiApp {
         }
 
         theme::rule(ui);
+
+        if always_on_top_supported() {
+            let mut enabled = self.always_on_top;
+            let changed = compact_choice_row(
+                ui,
+                self.t(Key::RowAlwaysOnTop),
+                self.t(Key::HintAlwaysOnTop),
+                |ui| {
+                    widgets::checkbox(ui, &mut enabled, self.t(Key::Enabled));
+                    enabled != self.always_on_top
+                },
+            );
+
+            if changed {
+                self.set_always_on_top(ui.ctx(), enabled);
+            }
+
+            theme::rule(ui);
+        }
 
         if crate::autostart::SUPPORTED {
             let mut enabled = self.autostart_enabled;
@@ -2477,34 +2550,35 @@ impl egui_software_backend::App for GuiApp {
                 ui.vertical_centered(|ui| {
                     ui.set_max_width(ui.available_width().min(CONTENT_WIDTH));
                     self.draw_topbar(ui);
-                    ui.add_space(4.0);
-                    theme::rule(ui);
+                    ui.add_space(8.0);
 
                     if self.simple_mode {
                         self.draw_simple_body(ui);
                     } else {
-                        self.draw_hero(ui);
-                        self.draw_metrics(ui);
-                        ui.add_space(2.0);
+                        theme::card().show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            self.draw_hero(ui);
+                            self.draw_metrics(ui);
+                        });
+                        ui.add_space(6.0);
                         self.draw_notice(ui);
-                        ui.add_space(3.0);
+                        ui.add_space(8.0);
                         self.draw_tabs(ui);
-                        ui.add_space(3.0);
+                        ui.add_space(8.0);
 
                         egui::ScrollArea::vertical()
                             .id_salt(("tab_scroll", self.tab))
                             .auto_shrink([false, false])
                             .show(ui, |ui| {
-                                ui.allocate_ui_with_layout(
-                                    Vec2::new(ui.available_width(), ui.available_height()),
-                                    Layout::top_down(Align::LEFT),
-                                    |ui| match self.tab {
+                                theme::card().show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+                                    match self.tab {
                                         Tab::Clicks => self.draw_clicks_tab(ui),
                                         Tab::Mode => self.draw_mode_tab(ui),
                                         Tab::Hotkeys => self.draw_hotkeys_tab(ui),
                                         Tab::System => self.draw_system_tab(ui),
-                                    },
-                                );
+                                    }
+                                });
                             });
                     }
                 });
@@ -2557,6 +2631,10 @@ pub fn run(start_hidden: bool) -> Result<(), Box<dyn std::error::Error>> {
         viewport = viewport.with_icon(icon);
     }
 
+    if loaded.config.always_on_top && always_on_top_supported() {
+        viewport = viewport.with_window_level(egui::WindowLevel::AlwaysOnTop);
+    }
+
     let config = SoftwareBackendAppConfiguration::new().viewport_builder(viewport);
 
     egui_software_backend::run_app_with_software_backend(config, move |ctx| {
@@ -2582,6 +2660,20 @@ fn load_icon() -> Option<egui::IconData> {
         width: info.width,
         height: info.height,
     })
+}
+
+/// Always-on-top is a real window hint on Windows and X11 only. On Wayland
+/// (and every other platform) winit ignores `set_window_level`, so the
+/// controls stay hidden instead of pretending to work.
+fn always_on_top_supported() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        !crate::backend::linux::is_wayland()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        cfg!(windows)
+    }
 }
 
 fn window_size(simple: bool) -> [f32; 2] {
@@ -2638,11 +2730,14 @@ fn compact_slider_row(
     let mut changed = false;
 
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 6.0;
+        // Zero implicit spacing + explicit gaps keeps the right edge of the
+        // input group exactly on the card grid for every suffix width.
+        ui.spacing_mut().item_spacing.x = 0.0;
         let _ = row_label(ui, title, hint, 22.0);
+        ui.add_space(6.0);
 
-        let field_width = widgets::numeric_row_width(ui, spec.suffix);
-        let slider_width = (ui.available_width() - field_width).max(60.0);
+        let field_width = widgets::numeric_row_width();
+        let slider_width = (ui.available_width() - field_width - 6.0).max(60.0);
         ui.allocate_ui_with_layout(
             Vec2::new(slider_width, 22.0),
             Layout::left_to_right(Align::Center),
@@ -2658,6 +2753,7 @@ fn compact_slider_row(
                 .changed();
             },
         );
+        ui.add_space(6.0);
 
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             changed |= widgets::numeric_field(
@@ -2685,8 +2781,9 @@ fn compact_integer_row(
     let mut changed = false;
 
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 6.0;
+        ui.spacing_mut().item_spacing.x = 0.0;
         let _ = row_label(ui, title, hint, 22.0);
+        ui.add_space(6.0);
 
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             changed |= widgets::integer_field(ui, value, range, 1.0, suffix);
@@ -2705,8 +2802,9 @@ fn compact_choice_row(
     let mut changed = false;
 
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 6.0;
+        ui.spacing_mut().item_spacing.x = 0.0;
         let _ = row_label(ui, title, hint, 22.0);
+        ui.add_space(6.0);
 
         ui.allocate_ui_with_layout(
             Vec2::new(ui.available_width(), 22.0),
