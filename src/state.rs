@@ -6,13 +6,16 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail};
 
-pub const PROTOCOL: u32 = 6;
+pub const PROTOCOL: u32 = 7;
 pub const MAX_LIMIT: u64 = 1_000_000_000;
 pub const MAX_DELAY_MS: f64 = 10_000.0;
 pub const MAX_MULTI_CLICK: u8 = 3;
 pub const MAX_POINTS: usize = 16;
 pub const MAX_POINT_INTERVAL_MS: u32 = 60_000;
 pub const DEFAULT_POINT_INTERVAL_MS: u32 = 100;
+pub const MIN_RANDOM_INTERVAL_MS: u32 = 10;
+pub const MAX_RANDOM_INTERVAL_MS: u32 = 60_000;
+pub const DEFAULT_RANDOM_INTERVAL_MS: u32 = 500;
 
 const CPS_WINDOW: Duration = Duration::from_secs(1);
 
@@ -57,6 +60,7 @@ pub enum ClickMode {
     Cursor,
     Point,
     Sequence,
+    Random,
 }
 
 impl ClickMode {
@@ -65,6 +69,7 @@ impl ClickMode {
             Self::Cursor => "cursor",
             Self::Point => "point",
             Self::Sequence => "sequence",
+            Self::Random => "random",
         }
     }
 
@@ -73,6 +78,7 @@ impl ClickMode {
             "cursor" => Some(Self::Cursor),
             "point" => Some(Self::Point),
             "sequence" | "points" | "multi-point" => Some(Self::Sequence),
+            "random" | "rand" => Some(Self::Random),
             _ => None,
         }
     }
@@ -141,6 +147,7 @@ pub struct Settings {
     pub target: Option<Point>,
     pub points: [Option<Point>; MAX_POINTS],
     pub point_interval: Duration,
+    pub random_interval: Duration,
 }
 
 impl Default for Settings {
@@ -157,6 +164,7 @@ impl Default for Settings {
             target: None,
             points: [None; MAX_POINTS],
             point_interval: Duration::from_millis(DEFAULT_POINT_INTERVAL_MS as u64),
+            random_interval: Duration::from_millis(DEFAULT_RANDOM_INTERVAL_MS as u64),
         }
     }
 }
@@ -243,6 +251,20 @@ impl Settings {
         self.point_interval.as_secs_f64() * 1000.0
     }
 
+    pub fn with_random_interval_ms(mut self, interval_ms: u32) -> Result<Self> {
+        if !(MIN_RANDOM_INTERVAL_MS..=MAX_RANDOM_INTERVAL_MS).contains(&interval_ms) {
+            bail!(
+                "random interval must be between {MIN_RANDOM_INTERVAL_MS} and {MAX_RANDOM_INTERVAL_MS} ms"
+            );
+        }
+        self.random_interval = Duration::from_millis(interval_ms as u64);
+        Ok(self)
+    }
+
+    pub fn random_interval_ms(&self) -> f64 {
+        self.random_interval.as_secs_f64() * 1000.0
+    }
+
     pub fn point_count(&self) -> usize {
         self.points.iter().flatten().count()
     }
@@ -268,6 +290,7 @@ impl Settings {
                 }
                 Ok(())
             }
+            ClickMode::Random => Ok(()),
         }
     }
 
@@ -308,6 +331,9 @@ impl Settings {
                 for point in self.points.iter().flatten() {
                     wire.push_str(&format!(" {} {}", point.x, point.y));
                 }
+            }
+            ClickMode::Random => {
+                wire.push_str(&format!(" {}", format_number(self.random_interval_ms())));
             }
         }
 
@@ -398,7 +424,7 @@ impl Status {
         };
 
         format!(
-            "OK\nprotocol: {}\nenabled: {}\ncps: {}\nbutton: {}\nhold_ms: {}\njitter_pct: {}\nlimit: {}\ndelay_ms: {}\nmulti_click: {}\nmode: {}\ntarget: {}\ninterval_ms: {}\npoints: {}\nactual_cps: {:.1}\nclicks: {}\nsession_clicks: {}\nstarting: {}\ndelay_left_ms: {}\nstop_reason: {}\nhotkey: {}\nhotkey_active: {}\nhold_hotkey: {}\nhold_hotkey_active: {}\nhold_active: {}\nhotkey_paused: {}\nhotkey_error: {}\nerror: {}\n",
+            "OK\nprotocol: {}\nenabled: {}\ncps: {}\nbutton: {}\nhold_ms: {}\njitter_pct: {}\nlimit: {}\ndelay_ms: {}\nmulti_click: {}\nmode: {}\ntarget: {}\ninterval_ms: {}\nrandom_interval_ms: {}\npoints: {}\nactual_cps: {:.1}\nclicks: {}\nsession_clicks: {}\nstarting: {}\ndelay_left_ms: {}\nstop_reason: {}\nhotkey: {}\nhotkey_active: {}\nhold_hotkey: {}\nhold_hotkey_active: {}\nhold_active: {}\nhotkey_paused: {}\nhotkey_error: {}\nerror: {}\n",
             self.protocol,
             self.enabled,
             format_number(self.settings.cps),
@@ -411,6 +437,7 @@ impl Status {
             self.settings.mode,
             target,
             format_number(self.settings.point_interval_ms()),
+            format_number(self.settings.random_interval_ms()),
             points,
             self.actual_cps,
             self.clicks,
@@ -453,6 +480,7 @@ impl Status {
         let mut mode = None;
         let mut target = None;
         let mut interval_ms = None;
+        let mut random_interval_ms = None;
         let mut points = Vec::new();
         let mut actual_cps = None;
         let mut clicks = None;
@@ -502,6 +530,7 @@ impl Status {
                     };
                 }
                 "interval_ms" => interval_ms = Some(value.parse::<u32>()?),
+                "random_interval_ms" => random_interval_ms = Some(value.parse::<u32>()?),
                 "points" => {
                     points.clear();
                     if !value.is_empty() && !value.eq_ignore_ascii_case("none") {
@@ -582,7 +611,8 @@ impl Status {
         .with_mode(mode)
         .with_target(target)?
         .with_points(&points)?
-        .with_point_interval_ms(interval_ms.unwrap_or(DEFAULT_POINT_INTERVAL_MS))?;
+        .with_point_interval_ms(interval_ms.unwrap_or(DEFAULT_POINT_INTERVAL_MS))?
+        .with_random_interval_ms(random_interval_ms.unwrap_or(DEFAULT_RANDOM_INTERVAL_MS))?;
 
         Ok(Self {
             protocol: protocol.unwrap_or(0),
@@ -1076,6 +1106,36 @@ mod tests {
             sequence.to_wire_command("ON"),
             "ON 125 left 10 0 0 0 1 sequence 250 2 1 2 -3 4"
         );
+
+        let random = base
+            .with_mode(ClickMode::Random)
+            .with_random_interval_ms(750)
+            .unwrap();
+        assert_eq!(
+            random.to_wire_command("ON"),
+            "ON 125 left 10 0 0 0 1 random 750"
+        );
+    }
+
+    #[test]
+    fn random_interval_is_validated_and_stored() {
+        let base = Settings::default();
+        assert_eq!(
+            base.random_interval,
+            Duration::from_millis(DEFAULT_RANDOM_INTERVAL_MS as u64)
+        );
+        assert!(
+            base.with_random_interval_ms(MIN_RANDOM_INTERVAL_MS - 1)
+                .is_err()
+        );
+        assert!(
+            base.with_random_interval_ms(MAX_RANDOM_INTERVAL_MS + 1)
+                .is_err()
+        );
+
+        let settings = base.with_random_interval_ms(1234).unwrap();
+        assert!((settings.random_interval_ms() - 1234.0).abs() < 1e-9);
+        assert!(settings.with_mode(ClickMode::Random).readiness().is_ok());
     }
 
     #[test]
@@ -1241,6 +1301,46 @@ mod tests {
         assert_eq!(parsed, status);
         assert_eq!(parsed.settings.point_count(), 3);
         assert_eq!(parsed.settings.point_at(1), Some(Point::new(-30, 40)));
+    }
+
+    #[test]
+    fn status_wire_round_trips_random_mode() {
+        let settings = Settings::new(123.456, Button::Middle, 7.25, 33.5)
+            .unwrap()
+            .with_limit(500)
+            .unwrap()
+            .with_delay_ms(250.0)
+            .unwrap()
+            .with_multi_click(3)
+            .unwrap()
+            .with_mode(ClickMode::Random)
+            .with_random_interval_ms(875)
+            .unwrap();
+        let status = Status {
+            protocol: PROTOCOL,
+            enabled: true,
+            settings,
+            actual_cps: 99.9,
+            clicks: 42,
+            session_clicks: 17,
+            starting: false,
+            delay_left_ms: 0,
+            stop_reason: None,
+            hotkey: "ctrl+alt+c".to_string(),
+            hotkey_active: "ctrl+shift+f8".to_string(),
+            hold_hotkey: "f9".to_string(),
+            hold_hotkey_active: "f9".to_string(),
+            hold_active: false,
+            hotkey_paused: false,
+            hotkey_error: None,
+            last_error: None,
+        };
+
+        let parsed = Status::from_wire(&status.to_wire()).unwrap();
+
+        assert_eq!(parsed, status);
+        assert_eq!(parsed.settings.mode, ClickMode::Random);
+        assert!((parsed.settings.random_interval_ms() - 875.0).abs() < 1e-9);
     }
 
     #[test]

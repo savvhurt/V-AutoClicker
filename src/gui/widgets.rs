@@ -15,35 +15,6 @@ const SUFFIX_SLOT: f32 = 20.0;
 const INPUT_GAP: f32 = 3.0;
 const INPUT_WIDTH: f32 = FIELD_WIDTH + INPUT_GAP + SUFFIX_SLOT;
 
-pub fn status_badge(ui: &mut Ui, text: &str, dot: Color32, pulse: bool) -> Response {
-    let text_color = if pulse { theme::text() } else { theme::muted() };
-    let galley = ui
-        .painter()
-        .layout_no_wrap(text.to_owned(), theme::mono_medium(9.0), text_color);
-    let size = Vec2::new(galley.size().x + 24.0, 22.0);
-    let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
-
-    let painter = ui.painter();
-    painter.rect_filled(
-        rect,
-        CornerRadius::same(7),
-        theme::alpha(dot, if pulse { 22 } else { 10 }),
-    );
-
-    let center = pos2(rect.left() + 8.0, rect.center().y);
-    if pulse {
-        painter.circle_filled(center, 5.0, theme::alpha(dot, 26));
-    }
-    painter.circle_filled(center, 2.4, dot);
-    painter.galley(
-        pos2(rect.left() + 15.0, rect.center().y - galley.size().y * 0.5),
-        galley,
-        text_color,
-    );
-
-    response
-}
-
 /// A small pin that toggles the always-on-top window level.
 pub fn pin_button(ui: &mut Ui, active: bool) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(26.0), Sense::click());

@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::hotkey::{DEFAULT as DEFAULT_HOTKEY, Hotkey};
 use crate::i18n::Language;
-use crate::state::{Button, ClickMode, DEFAULT_POINT_INTERVAL_MS, Point, Settings};
+use crate::state::{
+    Button, ClickMode, DEFAULT_POINT_INTERVAL_MS, DEFAULT_RANDOM_INTERVAL_MS,
+    MAX_RANDOM_INTERVAL_MS, MIN_RANDOM_INTERVAL_MS, Point, Settings,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Theme {
@@ -29,10 +32,11 @@ pub enum Theme {
     Ember,
     Plum,
     Wine,
+    LiquidGlass,
 }
 
 impl Theme {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::Paper,
         Self::Graphite,
         Self::Sand,
@@ -51,6 +55,7 @@ impl Theme {
         Self::Ember,
         Self::Plum,
         Self::Wine,
+        Self::LiquidGlass,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -73,6 +78,7 @@ impl Theme {
             Self::Ember => "ember",
             Self::Plum => "plum",
             Self::Wine => "wine",
+            Self::LiquidGlass => "liquidglass",
         }
     }
 
@@ -98,6 +104,13 @@ impl Theme {
             "ember" | "угли" => Some(Self::Ember),
             "plum" | "слива" => Some(Self::Plum),
             "wine" | "вино" => Some(Self::Wine),
+            "liquidglass"
+            | "liquid-glass"
+            | "liquid_glass"
+            | "liquid"
+            | "glass"
+            | "стекло"
+            | "жидкое стекло" => Some(Self::LiquidGlass),
             _ => None,
         }
     }
@@ -122,6 +135,7 @@ impl Theme {
             Self::Ember => 15,
             Self::Plum => 16,
             Self::Wine => 17,
+            Self::LiquidGlass => 18,
         }
     }
 
@@ -204,6 +218,8 @@ struct PersistedSettings {
     points: Vec<PersistedPoint>,
     #[serde(default = "default_point_interval")]
     point_interval_ms: u32,
+    #[serde(default = "default_random_interval")]
+    random_interval_ms: u32,
     #[serde(default = "default_hotkey")]
     hotkey: String,
     #[serde(default)]
@@ -240,6 +256,7 @@ impl PersistedSettings {
                 .map(|point| PersistedPoint::from(*point))
                 .collect(),
             point_interval_ms: config.settings.point_interval_ms().round() as u32,
+            random_interval_ms: config.settings.random_interval_ms().round() as u32,
             hotkey: config.hotkey.clone(),
             hold_hotkey: config.hold_hotkey.clone(),
             theme: config.theme.as_str().to_string(),
@@ -265,6 +282,10 @@ fn default_multi_click() -> u8 {
 
 fn default_point_interval() -> u32 {
     DEFAULT_POINT_INTERVAL_MS
+}
+
+fn default_random_interval() -> u32 {
+    DEFAULT_RANDOM_INTERVAL_MS
 }
 
 fn default_language() -> String {
@@ -430,6 +451,13 @@ fn parse_settings(persisted: &PersistedSettings) -> Result<Settings> {
     } else {
         persisted.point_interval_ms
     };
+    let random_interval = if (MIN_RANDOM_INTERVAL_MS..=MAX_RANDOM_INTERVAL_MS)
+        .contains(&persisted.random_interval_ms)
+    {
+        persisted.random_interval_ms
+    } else {
+        DEFAULT_RANDOM_INTERVAL_MS
+    };
 
     Settings::new(
         persisted.cps,
@@ -444,6 +472,7 @@ fn parse_settings(persisted: &PersistedSettings) -> Result<Settings> {
     .with_target(persisted.target.map(Point::from))?
     .with_points(&points)?
     .with_point_interval_ms(interval)
+    .and_then(|settings| settings.with_random_interval_ms(random_interval))
 }
 
 pub fn config_path() -> Result<PathBuf> {
@@ -553,6 +582,7 @@ mod tests {
         assert_eq!(parsed.mode, "sequence");
         assert_eq!(parsed.points.len(), 2);
         assert_eq!(parsed.point_interval_ms, 175);
+        assert_eq!(parsed.random_interval_ms, DEFAULT_RANDOM_INTERVAL_MS);
         assert!(parsed.simple_mode);
         assert!(parsed.always_on_top);
         assert!(parsed.minimize_to_tray);
@@ -580,10 +610,31 @@ mod tests {
         assert_eq!(settings.mode, ClickMode::Cursor);
         assert_eq!(settings.target, None);
         assert_eq!(settings.point_count(), 0);
+        assert!((settings.random_interval_ms() - DEFAULT_RANDOM_INTERVAL_MS as f64).abs() < 1e-9);
 
         let persisted: PersistedSettings = toml::from_str(text).unwrap();
         assert!(!persisted.simple_mode);
         assert!(!persisted.always_on_top);
+    }
+
+    #[test]
+    fn random_interval_round_trips_and_sanitizes() {
+        let text = "cps = 50\nbutton = \"left\"\nhold_ms = 10\njitter_pct = 0\n\
+                    mode = \"random\"\nrandom_interval_ms = 1250\n";
+        let settings = parse(text).unwrap();
+        assert_eq!(settings.mode, ClickMode::Random);
+        assert!((settings.random_interval_ms() - 1250.0).abs() < 1e-9);
+
+        let mut config = sample_config();
+        config.settings = settings;
+        let serialized = serialize(&config).unwrap();
+        assert!(serialized.contains("random_interval_ms = 1250"));
+
+        // Out-of-range values fall back to the default instead of failing.
+        let text = "cps = 50\nbutton = \"left\"\nhold_ms = 10\njitter_pct = 0\n\
+                    mode = \"random\"\nrandom_interval_ms = 1\n";
+        let settings = parse(text).unwrap();
+        assert!((settings.random_interval_ms() - DEFAULT_RANDOM_INTERVAL_MS as f64).abs() < 1e-9);
     }
 
     #[test]
@@ -656,9 +707,11 @@ mod tests {
         assert_eq!(Theme::parse("угли"), Some(Theme::Ember));
         assert_eq!(Theme::parse("Plum"), Some(Theme::Plum));
         assert_eq!(Theme::parse("вино"), Some(Theme::Wine));
+        assert_eq!(Theme::parse("liquid-glass"), Some(Theme::LiquidGlass));
+        assert_eq!(Theme::parse("Стекло"), Some(Theme::LiquidGlass));
         assert_eq!(Theme::parse("neon"), None);
 
-        assert_eq!(Theme::ALL.len(), 18);
+        assert_eq!(Theme::ALL.len(), 19);
         for theme in Theme::ALL {
             assert_eq!(Theme::parse(theme.as_str()), Some(theme));
             assert_eq!(Theme::from_index(theme.index()), theme);

@@ -149,6 +149,14 @@ define_strings! {
     ThemeEmber: ["Ember", "Угли", "Glut", "Braise", "Brasa", "Brasa"],
     ThemePlum: ["Plum", "Слива", "Pflaume", "Prune", "Ciruela", "Ameixa"],
     ThemeWine: ["Wine", "Вино", "Wein", "Vin", "Vino", "Vinho"],
+    ThemeLiquidGlass: [
+        "Liquid Glass",
+        "Жидкое стекло",
+        "Flüssiges Glas",
+        "Verre liquide",
+        "Vidrio líquido",
+        "Vidro líquido"
+    ],
     ThemeNotice: ["Theme: {}.", "Тема: {}.", "Design: {}.", "Thème : {}.", "Tema: {}.", "Tema: {}."],
     StatusStarting: ["STARTING", "ЗАПУСК", "START", "DÉMARRAGE", "INICIANDO", "INICIANDO"],
     StatusStopping: ["STOPPING", "ОСТАНОВКА", "STOPPEN", "ARRÊT", "DETENIENDO", "PARANDO"],
@@ -619,7 +627,8 @@ define_strings! {
         "Tecla de mantener desactivada.",
         "Tecla de segurar desativada."
     ],
-    TargetSequence: ["SEQUENCE", "ПОСЛЕДОВАТЕЛЬНО", "SEQUENZ", "SÉQUENCE", "SECUENCIA", "SEQUÊNCIA"],
+    TargetSequence: ["SEQUENCE", "СЕРИЯ", "SEQUENZ", "SÉQUENCE", "SECUENCIA", "SEQUÊNCIA"],
+    TargetRandom: ["RANDOM", "СЛУЧАЙНО", "ZUFALL", "ALÉATOIRE", "ALEATORIO", "ALEATÓRIO"],
     PickWaiting: [
         "Click anywhere to pick a point. Esc cancels.",
         "Кликните в любом месте, чтобы выбрать точку. Esc — отмена.",
@@ -652,6 +661,38 @@ define_strings! {
         "Délai entre les points de la séquence, 1 - 60000 ms",
         "Pausa entre los puntos de la secuencia, 1 - 60000 ms",
         "Pausa entre os pontos da sequência, 1 - 60000 ms"
+    ],
+    RowRandomInterval: [
+        "Random interval",
+        "Случайный интервал",
+        "Zufallsintervall",
+        "Intervalle aléatoire",
+        "Intervalo aleatorio",
+        "Intervalo aleatório"
+    ],
+    HintRandomInterval: [
+        "Delay between clicks at random points, 10 - 60000 ms",
+        "Пауза между кликами в случайных точках, 10 - 60000 мс",
+        "Pause zwischen Klicks an zufälligen Punkten, 10 - 60000 ms",
+        "Délai entre les clics à des points aléatoires, 10 - 60000 ms",
+        "Pausa entre clics en puntos aleatorios, 10 - 60000 ms",
+        "Pausa entre cliques em pontos aleatórios, 10 - 60000 ms"
+    ],
+    HintRandomMode: [
+        "Clicks land on random spots across the whole desktop. Speed, hold and jitter are ignored.",
+        "Клики попадают в случайные точки по всему рабочему столу. Скорость, удержание и джиттер не используются.",
+        "Klicks landen an zufälligen Stellen auf dem gesamten Desktop. Geschwindigkeit, Haltezeit und Jitter werden ignoriert.",
+        "Les clics tombent à des endroits aléatoires sur tout le bureau. Vitesse, maintien et variation sont ignorés.",
+        "Los clics caen en puntos aleatorios por todo el escritorio. La velocidad, el mantenimiento y la variación se ignoran.",
+        "Os cliques caem em pontos aleatórios por toda a área de trabalho. Velocidade, duração e variação são ignorados."
+    ],
+    HintRandomClicks: [
+        "Random mode clicks once per interval. The limit 0 means unlimited.",
+        "Случайный режим кликает раз в интервал. Лимит 0 — без ограничения.",
+        "Der Zufallsmodus klickt einmal pro Intervall. Limit 0 bedeutet unbegrenzt.",
+        "Le mode aléatoire clique une fois par intervalle. Limite 0 signifie illimité.",
+        "El modo aleatorio hace clic una vez por intervalo. Límite 0 significa ilimitado.",
+        "O modo aleatório clica uma vez por intervalo. Limite 0 significa ilimitado."
     ],
     RowPoints: ["Points", "Точки", "Punkte", "Points", "Puntos", "Pontos"],
     HintPoints: [
@@ -703,6 +744,14 @@ define_strings! {
         "Séquence de {} points.",
         "Secuencia de {} puntos.",
         "Sequência de {} pontos."
+    ],
+    HeroRandomClicks: [
+        "Clicks at random desktop points.",
+        "Клики в случайных точках рабочего стола.",
+        "Klicks an zufälligen Desktop-Punkten.",
+        "Clics à des points aléatoires du bureau.",
+        "Clics en puntos aleatorios del escritorio.",
+        "Cliques em pontos aleatórios da área de trabalho."
     ],
     RowMinimizeTray: ["Minimize to tray", "Свернуть в трей", "In den Infobereich minimieren", "Réduire dans la zone de notification", "Minimizar a la bandeja", "Minimizar para a bandeja"],
     HintMinimizeTray: [

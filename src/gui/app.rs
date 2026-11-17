@@ -15,8 +15,8 @@ use super::{theme, widgets};
 
 use crate::i18n::{self, Key, Lang, Language};
 use crate::state::{
-    Button, ClickMode, MAX_DELAY_MS, MAX_LIMIT, MAX_POINT_INTERVAL_MS, MAX_POINTS, Point, Settings,
-    Status, StopReason,
+    Button, ClickMode, MAX_DELAY_MS, MAX_LIMIT, MAX_POINT_INTERVAL_MS, MAX_POINTS,
+    MAX_RANDOM_INTERVAL_MS, MIN_RANDOM_INTERVAL_MS, Point, Settings, Status, StopReason,
 };
 
 const APPLY_DEBOUNCE: Duration = Duration::from_millis(250);
@@ -100,6 +100,7 @@ struct DraftSettings {
     target: Option<Point>,
     points: [Option<Point>; MAX_POINTS],
     point_interval_ms: f64,
+    random_interval_ms: f64,
 }
 
 impl From<Settings> for DraftSettings {
@@ -116,6 +117,7 @@ impl From<Settings> for DraftSettings {
             target: settings.target,
             points: settings.points,
             point_interval_ms: settings.point_interval_ms(),
+            random_interval_ms: settings.random_interval_ms(),
         }
     }
 }
@@ -165,6 +167,11 @@ impl DraftSettings {
             .point_interval_ms
             .round()
             .clamp(1.0, MAX_POINT_INTERVAL_MS as f64) as u32;
+        let random_interval = self
+            .random_interval_ms
+            .round()
+            .clamp(MIN_RANDOM_INTERVAL_MS as f64, MAX_RANDOM_INTERVAL_MS as f64)
+            as u32;
 
         Settings::new(self.cps, self.button, self.hold_ms, self.jitter_pct)
             .and_then(|settings| settings.with_limit(self.limit))
@@ -174,6 +181,7 @@ impl DraftSettings {
             .and_then(|settings| settings.with_target(self.target))
             .and_then(|settings| settings.with_points(&points))
             .and_then(|settings| settings.with_point_interval_ms(interval))
+            .and_then(|settings| settings.with_random_interval_ms(random_interval))
             .map_err(|error| format!("{error:#}"))
     }
 }
@@ -736,6 +744,7 @@ impl GuiApp {
             Theme::Ember => Key::ThemeEmber,
             Theme::Plum => Key::ThemePlum,
             Theme::Wine => Key::ThemeWine,
+            Theme::LiquidGlass => Key::ThemeLiquidGlass,
         })
     }
 
@@ -1112,32 +1121,6 @@ impl GuiApp {
         let _ = self.commands.send(Command::QuitDaemon);
     }
 
-    fn status_palette(&self) -> (&'static str, Color32, bool) {
-        if self.start_guard.is_some() {
-            return (self.t(Key::StatusStarting), theme::accent(), true);
-        }
-        if let Some((start, _)) = self.pending_toggle {
-            return (
-                if start {
-                    self.t(Key::StatusStarting)
-                } else {
-                    self.t(Key::StatusStopping)
-                },
-                theme::accent(),
-                true,
-            );
-        }
-        if !self.online {
-            (self.t(Key::StatusOffline), theme::dim(), false)
-        } else if self.starting {
-            (self.t(Key::StatusDelay), theme::warning(), true)
-        } else if self.enabled {
-            (self.t(Key::StatusActive), theme::accent(), true)
-        } else {
-            (self.t(Key::StatusIdle), theme::warning(), false)
-        }
-    }
-
     fn draw_topbar(&mut self, ui: &mut Ui) {
         let mut toggle_mode = false;
         let mut toggle_pin = false;
@@ -1173,13 +1156,6 @@ impl GuiApp {
                     {
                         toggle_pin = true;
                     }
-                }
-
-                ui.add_space(6.0);
-                let (label, color, pulse) = self.status_palette();
-                let response = widgets::status_badge(ui, label, color, pulse);
-                if let Some(reason) = &self.offline_reason {
-                    let _ = response.on_hover_text(reason);
                 }
             });
         });
@@ -1228,19 +1204,35 @@ impl GuiApp {
                 });
 
             theme::rule(ui);
-            changed |= compact_slider_row(
-                ui,
-                self.t(Key::RowSpeed),
-                self.t(Key::HintSpeed),
-                &mut draft.cps,
-                SliderSpec {
-                    range: 0.2..=1000.0,
-                    logarithmic: true,
-                    step: 0.1,
-                    decimals: 1,
-                    suffix: "CPS",
-                },
-            );
+            changed |= if draft.mode == ClickMode::Random {
+                compact_slider_row(
+                    ui,
+                    self.t(Key::RowRandomInterval),
+                    self.t(Key::HintRandomInterval),
+                    &mut draft.random_interval_ms,
+                    SliderSpec {
+                        range: MIN_RANDOM_INTERVAL_MS as f64..=MAX_RANDOM_INTERVAL_MS as f64,
+                        logarithmic: true,
+                        step: 1.0,
+                        decimals: 0,
+                        suffix: self.t(Key::UnitMs),
+                    },
+                )
+            } else {
+                compact_slider_row(
+                    ui,
+                    self.t(Key::RowSpeed),
+                    self.t(Key::HintSpeed),
+                    &mut draft.cps,
+                    SliderSpec {
+                        range: 0.2..=1000.0,
+                        logarithmic: true,
+                        step: 0.1,
+                        decimals: 1,
+                        suffix: "CPS",
+                    },
+                )
+            };
 
             if changed {
                 self.settings = draft;
@@ -1310,6 +1302,8 @@ impl GuiApp {
                     Key::HeroSequenceClicks,
                     &[self.settings.point_count().to_string()],
                 )
+            } else if self.settings.mode == ClickMode::Random {
+                self.t(Key::HeroRandomClicks).to_string()
             } else if self.settings.target.is_some() {
                 self.t(Key::HeroTargetClicks).to_string()
             } else {
@@ -1424,11 +1418,11 @@ impl GuiApp {
             );
         }
         if !self.online {
-            return (
-                theme::dim(),
-                self.t(Key::NoticeDaemon),
-                self.t(Key::NoticeDaemonDown).to_string(),
-            );
+            let detail = self
+                .offline_reason
+                .clone()
+                .unwrap_or_else(|| self.t(Key::NoticeDaemonDown).to_string());
+            return (theme::dim(), self.t(Key::NoticeDaemon), detail);
         }
         (
             theme::dim(),
@@ -1498,6 +1492,20 @@ impl GuiApp {
                 )
                 .wrap(),
             );
+        } else if draft.mode == ClickMode::Random {
+            changed |= compact_slider_row(
+                ui,
+                self.t(Key::RowRandomInterval),
+                self.t(Key::HintRandomInterval),
+                &mut draft.random_interval_ms,
+                SliderSpec {
+                    range: MIN_RANDOM_INTERVAL_MS as f64..=MAX_RANDOM_INTERVAL_MS as f64,
+                    logarithmic: true,
+                    step: 1.0,
+                    decimals: 0,
+                    suffix: self.t(Key::UnitMs),
+                },
+            );
         } else {
             changed |= compact_slider_row(
                 ui,
@@ -1532,37 +1540,39 @@ impl GuiApp {
         theme::rule(ui);
 
         let ms = self.t(Key::UnitMs);
-        changed |= compact_slider_row(
-            ui,
-            self.t(Key::RowHold),
-            self.t(Key::HintHold),
-            &mut draft.hold_ms,
-            SliderSpec {
-                range: 0.1..=5000.0,
-                logarithmic: false,
-                step: 0.1,
-                decimals: 2,
-                suffix: ms,
-            },
-        );
+        if draft.mode != ClickMode::Random {
+            changed |= compact_slider_row(
+                ui,
+                self.t(Key::RowHold),
+                self.t(Key::HintHold),
+                &mut draft.hold_ms,
+                SliderSpec {
+                    range: 0.1..=5000.0,
+                    logarithmic: false,
+                    step: 0.1,
+                    decimals: 2,
+                    suffix: ms,
+                },
+            );
 
-        theme::rule(ui);
+            theme::rule(ui);
 
-        changed |= compact_slider_row(
-            ui,
-            self.t(Key::RowJitter),
-            self.t(Key::HintJitter),
-            &mut draft.jitter_pct,
-            SliderSpec {
-                range: 0.0..=100.0,
-                logarithmic: false,
-                step: 0.5,
-                decimals: 2,
-                suffix: "%",
-            },
-        );
+            changed |= compact_slider_row(
+                ui,
+                self.t(Key::RowJitter),
+                self.t(Key::HintJitter),
+                &mut draft.jitter_pct,
+                SliderSpec {
+                    range: 0.0..=100.0,
+                    logarithmic: false,
+                    step: 0.5,
+                    decimals: 2,
+                    suffix: "%",
+                },
+            );
 
-        theme::rule(ui);
+            theme::rule(ui);
+        }
 
         let pieces = self.t(Key::UnitPieces);
         changed |= compact_integer_row(
@@ -1592,10 +1602,20 @@ impl GuiApp {
 
         let period_ms = match draft.mode {
             ClickMode::Sequence => draft.point_interval_ms,
+            ClickMode::Random => draft.random_interval_ms,
             ClickMode::Cursor | ClickMode::Point => 1000.0 / draft.cps.max(0.2),
         };
         let effective_hold = draft.hold_ms.min((period_ms - 0.2).max(0.1));
-        let hint = if draft.hold_ms > effective_hold + 0.001 {
+        let hint = if draft.mode == ClickMode::Random {
+            if draft.limit > 0 {
+                (
+                    theme::muted(),
+                    self.fill(Key::HintLimitOn, &[group_digits(draft.limit)]),
+                )
+            } else {
+                (theme::dim(), self.t(Key::HintRandomClicks).to_string())
+            }
+        } else if draft.hold_ms > effective_hold + 0.001 {
             (
                 theme::warning(),
                 self.fill(Key::HintHoldClamped, &[trim_number(effective_hold)]),
@@ -1649,6 +1669,7 @@ impl GuiApp {
                             (ClickMode::Cursor, self.t(Key::TargetCursor)),
                             (ClickMode::Point, self.t(Key::TargetPoint)),
                             (ClickMode::Sequence, self.t(Key::TargetSequence)),
+                            (ClickMode::Random, self.t(Key::TargetRandom)),
                         ],
                     );
                 },
@@ -1682,6 +1703,18 @@ impl GuiApp {
                     .wrap(),
                 );
             }
+        }
+
+        if draft.mode == ClickMode::Random {
+            ui.add_space(2.0);
+            ui.add(
+                egui::Label::new(
+                    RichText::new(self.t(Key::HintRandomMode))
+                        .font(theme::sans(10.0))
+                        .color(theme::dim()),
+                )
+                .wrap(),
+            );
         }
 
         if draft.mode == ClickMode::Point && draft.target.is_none() {
@@ -2527,10 +2560,12 @@ impl egui_software_backend::App for GuiApp {
         self.check_worker_health(ui.ctx());
         self.maybe_apply_settings();
 
+        theme::paint_backdrop(ui);
+
         egui::CentralPanel::default()
             .frame(
                 Frame::new()
-                    .fill(theme::bg())
+                    .fill(theme::backdrop_fill())
                     .inner_margin(Margin::symmetric(16, 10)),
             )
             .show_inside(ui, |ui| {
@@ -2539,7 +2574,7 @@ impl egui_software_backend::App for GuiApp {
                     egui::Panel::bottom("daemon_footer")
                         .frame(
                             Frame::new()
-                                .fill(theme::bg())
+                                .fill(theme::bar_fill())
                                 .inner_margin(Margin::symmetric(0, 4)),
                         )
                         .show_separator_line(false)
@@ -2931,6 +2966,7 @@ fn settings_equivalent(left: &Settings, right: &Settings) -> bool {
         && left.target == right.target
         && left.points == right.points
         && left.point_interval == right.point_interval
+        && left.random_interval == right.random_interval
         && (left.cps - right.cps).abs() < 0.001
         && (left.hold_ms() - right.hold_ms()).abs() < 0.001
         && (left.jitter_pct - right.jitter_pct).abs() < 0.001

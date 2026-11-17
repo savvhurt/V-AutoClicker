@@ -53,6 +53,21 @@ impl X11 {
             .flush()
             .context("failed to flush the X11 cursor request")
     }
+
+    fn bounds(&self) -> Result<super::ScreenBounds> {
+        let geometry = self
+            .connection
+            .get_geometry(self.root)
+            .context("failed to read the X11 screen geometry")?
+            .reply()
+            .context("failed to receive the X11 screen geometry")?;
+        Ok(super::ScreenBounds {
+            x: geometry.x as i32,
+            y: geometry.y as i32,
+            width: geometry.width as i32,
+            height: geometry.height as i32,
+        })
+    }
 }
 
 impl LinuxBackend {
@@ -131,6 +146,10 @@ impl super::Backend for LinuxBackend {
 
     fn supports_target(&self) -> bool {
         self.target_supported
+    }
+
+    fn screen_bounds(&mut self) -> Result<super::ScreenBounds> {
+        self.x11()?.bounds()
     }
 }
 

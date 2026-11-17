@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use crate::backend::Backend;
+use crate::backend::{Backend, ScreenBounds};
 use crate::state::{ClickMode, Point, Settings, SharedState, Snapshot, StopReason};
 
 const MAX_SLEEP_SLICE: Duration = Duration::from_millis(20);
@@ -10,6 +10,12 @@ const MAX_PERIOD: Duration = Duration::from_secs(3600);
 const MIN_HOLD: Duration = Duration::from_micros(100);
 const RELEASE_GAP: Duration = Duration::from_micros(200);
 const MULTI_CLICK_GAP: Duration = Duration::from_millis(40);
+/// Random mode ignores the hold slider: a short, predictable press is enough
+/// and the only parameter the user controls there is the interval.
+const RANDOM_HOLD: Duration = Duration::from_millis(10);
+/// Keep random points away from the very edge of the desktop, where hot
+/// corners and resize borders live.
+const RANDOM_MARGIN: i32 = 8;
 
 #[cfg(target_os = "linux")]
 const SPIN_MARGIN: Duration = Duration::from_micros(200);
@@ -49,6 +55,7 @@ fn click_series(shared: &SharedState, backend: &mut dyn Backend, initial: Snapsh
 
     let mut deadline = Instant::now();
     let mut sequence_index = 0usize;
+    let mut bounds: Option<ScreenBounds> = None;
 
     loop {
         let snapshot = shared.snapshot();
@@ -58,7 +65,11 @@ fn click_series(shared: &SharedState, backend: &mut dyn Backend, initial: Snapsh
 
         let settings = snapshot.settings;
         let period = jittered_period(settings, rng);
-        let hold = clamp_hold(settings.hold, period);
+        let hold = if settings.mode == ClickMode::Random {
+            clamp_hold(RANDOM_HOLD, period)
+        } else {
+            clamp_hold(settings.hold, period)
+        };
 
         if !sleep_until(deadline, shared, initial.version) {
             break;
@@ -89,6 +100,34 @@ fn click_series(shared: &SharedState, backend: &mut dyn Backend, initial: Snapsh
                     break;
                 }
                 click_burst(shared, backend, settings, hold, initial.version)
+            }
+            ClickMode::Random => {
+                let point = match bounds {
+                    Some(bounds) => random_point(bounds, rng),
+                    None => match backend.screen_bounds() {
+                        Ok(found) if !found.is_empty() => {
+                            bounds = Some(found);
+                            random_point(found, rng)
+                        }
+                        Ok(_) => {
+                            shared.set_error("the desktop has no clickable area".to_string());
+                            shared.off();
+                            break;
+                        }
+                        Err(error) => {
+                            shared.set_error(format!("random clicking is unavailable: {error:#}"));
+                            shared.off();
+                            break;
+                        }
+                    },
+                };
+                if !move_to_target(shared, backend, Some(point)) {
+                    break;
+                }
+                // Random mode is a single click per interval.
+                let mut single = settings;
+                single.multi_click = 1;
+                click_burst(shared, backend, single, hold, initial.version)
             }
         };
 
@@ -172,9 +211,25 @@ fn move_to_target(shared: &SharedState, backend: &mut dyn Backend, target: Optio
 fn jittered_period(settings: Settings, rng: &mut Rng) -> Duration {
     let base = match settings.mode {
         ClickMode::Sequence => settings.point_interval,
+        // Random mode exposes exactly one setting, so the interval is exact:
+        // no jitter is applied even if the hidden jitter value is non-zero.
+        ClickMode::Random => {
+            return settings.random_interval.clamp(MIN_PERIOD, MAX_PERIOD);
+        }
         ClickMode::Cursor | ClickMode::Point => Duration::from_secs_f64(1.0 / settings.cps),
     };
     jittered_interval(base, settings.jitter_pct, rng)
+}
+
+fn random_point(bounds: ScreenBounds, rng: &mut Rng) -> Point {
+    let margin_x = RANDOM_MARGIN.min((bounds.width - 1).max(0) / 2);
+    let margin_y = RANDOM_MARGIN.min((bounds.height - 1).max(0) / 2);
+    let width = (bounds.width - 2 * margin_x).max(1);
+    let height = (bounds.height - 2 * margin_y).max(1);
+
+    let x = bounds.x + margin_x + (rng.next_f64() * width as f64).floor() as i32;
+    let y = bounds.y + margin_y + (rng.next_f64() * height as f64).floor() as i32;
+    Point::new(x, y)
 }
 
 fn jittered_interval(base: Duration, jitter_pct: f64, rng: &mut Rng) -> Duration {
@@ -260,6 +315,7 @@ mod tests {
         presses: Arc<AtomicUsize>,
         releases: Arc<AtomicUsize>,
         moves: Arc<Mutex<Vec<Point>>>,
+        bounds: ScreenBounds,
         down: bool,
     }
 
@@ -279,6 +335,12 @@ mod tests {
                     presses: presses.clone(),
                     releases: releases.clone(),
                     moves: moves.clone(),
+                    bounds: ScreenBounds {
+                        x: -1920,
+                        y: -120,
+                        width: 3840,
+                        height: 1200,
+                    },
                     down: false,
                 },
                 presses,
@@ -310,6 +372,10 @@ mod tests {
 
         fn supports_target(&self) -> bool {
             true
+        }
+
+        fn screen_bounds(&mut self) -> anyhow::Result<ScreenBounds> {
+            Ok(self.bounds)
         }
     }
 
@@ -644,6 +710,91 @@ mod tests {
 
         assert_eq!(presses.load(Ordering::SeqCst), 2);
         assert!(started.elapsed() >= Duration::from_millis(230));
+
+        shared.quit();
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn random_points_stay_inside_the_inset_desktop() {
+        let bounds = ScreenBounds {
+            x: -1920,
+            y: -200,
+            width: 3840,
+            height: 1280,
+        };
+        let mut rng = Rng::new();
+
+        for _ in 0..10_000 {
+            let point = random_point(bounds, &mut rng);
+            assert!(point.x >= bounds.x + RANDOM_MARGIN);
+            assert!(point.x < bounds.x + bounds.width - RANDOM_MARGIN);
+            assert!(point.y >= bounds.y + RANDOM_MARGIN);
+            assert!(point.y < bounds.y + bounds.height - RANDOM_MARGIN);
+        }
+    }
+
+    #[test]
+    fn random_points_handle_tiny_desktops() {
+        let bounds = ScreenBounds {
+            x: 5,
+            y: 7,
+            width: 4,
+            height: 3,
+        };
+        let mut rng = Rng::new();
+        for _ in 0..100 {
+            let point = random_point(bounds, &mut rng);
+            assert!((5..9).contains(&point.x));
+            assert!((7..10).contains(&point.y));
+        }
+    }
+
+    #[test]
+    fn random_interval_ignores_jitter_and_hold_sliders() {
+        let settings = Settings::new(50.0, Button::Left, 4000.0, 100.0)
+            .unwrap()
+            .with_mode(ClickMode::Random)
+            .with_random_interval_ms(750)
+            .unwrap();
+        let mut rng = Rng::new();
+        for _ in 0..100 {
+            assert_eq!(
+                jittered_period(settings, &mut rng),
+                Duration::from_millis(750)
+            );
+        }
+    }
+
+    #[test]
+    fn random_mode_clicks_single_points_within_bounds() {
+        let settings = Settings::new(50.0, Button::Left, 1.0, 0.0)
+            .unwrap()
+            .with_mode(ClickMode::Random)
+            .with_random_interval_ms(10)
+            .unwrap()
+            // Random mode must ignore the multi-click value.
+            .with_multi_click(3)
+            .unwrap()
+            .with_limit(3)
+            .unwrap();
+        let (shared, presses, releases, moves, handle) = spawn_clicker(settings);
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while shared.status().enabled && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(5));
+        }
+
+        assert_eq!(presses.load(Ordering::SeqCst), 3);
+        assert_eq!(releases.load(Ordering::SeqCst), 3);
+        assert_eq!(shared.status().stop_reason, Some(StopReason::Limit));
+
+        let moves = moves.lock().unwrap();
+        assert_eq!(moves.len(), 3);
+        for point in moves.iter() {
+            assert!((-1920 + RANDOM_MARGIN..-1920 + 3840 - RANDOM_MARGIN).contains(&point.x));
+            assert!((-120 + RANDOM_MARGIN..-120 + 1200 - RANDOM_MARGIN).contains(&point.y));
+        }
 
         shared.quit();
         handle.join().unwrap();

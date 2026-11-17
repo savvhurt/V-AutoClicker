@@ -375,6 +375,7 @@ fn parse_settings(
     let mut target = None;
     let mut points = Vec::new();
     let mut interval_ms = crate::state::DEFAULT_POINT_INTERVAL_MS;
+    let mut random_interval_ms = crate::state::DEFAULT_RANDOM_INTERVAL_MS;
 
     if let Some(value) = parts.next() {
         if let Some(parsed) = ClickMode::parse(value) {
@@ -406,6 +407,13 @@ fn parse_settings(
                     for _ in 0..count {
                         let (x, y) = read_point(&mut parts)?;
                         points.push(Point::new(x, y));
+                    }
+                }
+                ClickMode::Random => {
+                    if let Some(value) = parts.next() {
+                        random_interval_ms = value
+                            .parse::<u32>()
+                            .map_err(|_| "ERR invalid random_interval_ms\n".to_string())?;
                     }
                 }
             }
@@ -443,6 +451,7 @@ fn parse_settings(
         .and_then(|settings| settings.with_target(target))
         .and_then(|settings| settings.with_points(&points))
         .and_then(|settings| settings.with_point_interval_ms(interval_ms))
+        .and_then(|settings| settings.with_random_interval_ms(random_interval_ms))
         .map_err(|error| format!("ERR {error}\n"))
 }
 
@@ -564,6 +573,37 @@ mod tests {
         assert_eq!(status.settings.point_at(0), Some(Point::new(-10, 20)));
         assert_eq!(status.settings.point_at(2), Some(Point::new(500, 600)));
         assert!((status.settings.point_interval_ms() - 250.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn set_command_accepts_random_mode_and_its_interval() {
+        let shared = SharedState::new(Settings::default(), false);
+
+        assert_eq!(
+            process("SET 50 left 10 0 0 0 1 random 1500", &shared),
+            "OK\n"
+        );
+
+        let status = shared.status();
+        assert_eq!(status.settings.mode, ClickMode::Random);
+        assert!((status.settings.random_interval_ms() - 1500.0).abs() < 1e-9);
+
+        // The interval argument is optional and falls back to the default.
+        assert_eq!(process("SET 50 left 10 0 0 0 1 random", &shared), "OK\n");
+        assert!(
+            (shared.status().settings.random_interval_ms()
+                - crate::state::DEFAULT_RANDOM_INTERVAL_MS as f64)
+                .abs()
+                < 1e-9
+        );
+
+        assert!(process("SET 50 left 10 0 0 0 1 random 0", &shared).starts_with("ERR "));
+        assert_eq!(
+            process("ON 50 left 10 0 0 0 1 random 2500", &shared),
+            "OK\n"
+        );
+        assert!(shared.status().enabled);
+        assert!((shared.status().settings.random_interval_ms() - 2500.0).abs() < 1e-9);
     }
 
     #[test]

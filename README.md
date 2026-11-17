@@ -18,7 +18,7 @@
 # V-AutoClicker
 
 **A fast, minimal, lightweight autoclicker written on Rust for Windows and Linux.**<br>
-Native input, three click modes, eighteen themes, one small binary.
+Native input, four click modes, nineteen themes, one small binary.
 
 [Download](https://github.com/savvhurt/V-AutoClicker/releases/latest) ·
 [CLI](#cli) ·
@@ -31,8 +31,9 @@ Native input, three click modes, eighteen themes, one small binary.
 ## Highlights
 
 - **0.2-1000 CPS** with hold duration, jitter, start delay and a per-session limit.
-- **Cursor, Point and Sequence modes** - click where the mouse is, at fixed
-  coordinates, or through up to 16 points in order.
+- **Cursor, Point, Sequence and Random modes** - click where the mouse is, at
+  fixed coordinates, through up to 16 points in order, or at random points
+  across the whole desktop.
 - **Simple and Advanced layouts** - a compact Start/Stop panel or the full
   tabbed interface, switchable at any time.
 - **Eyedropper** for capturing coordinates; single, double and triple clicks.
@@ -40,7 +41,8 @@ Native input, three click modes, eighteen themes, one small binary.
 - **Hold-to-click** on Windows with a second hotkey.
 - **Autostart** on both platforms, plus optional **minimize to tray** on Windows.
 - **Always on top** on Windows and X11, with a pin in the top bar.
-- **18 themes**, six interface languages and automatic DPI scaling.
+- **19 themes**, including the experimental **Liquid Glass**, six interface
+  languages and automatic DPI scaling.
 - **One binary**: no arguments opens the GUI, subcommands stay on the CLI.
 - Settings live in `gui.toml` and are saved automatically.
 
@@ -120,10 +122,15 @@ binds {
 For GNOME or KDE create a custom shortcut with the command `v-autoclicker toggle`.
 Do not use `Mod+Shift+C` in niri: it is already bound to `center-column`.
 
-### Point and sequence modes
+### Point, sequence and random modes
 
-Point and sequence modes use `XWarpPointer`. They work on X11 and XWayland but
-not in native Wayland windows; the GUI shows a notice on Wayland.
+Point, sequence and random modes use `XWarpPointer`. They work on X11 and
+XWayland but not in native Wayland windows; the GUI shows a notice on Wayland.
+
+Random mode ignores CPS, hold, jitter and multi-click: it simply waits for the
+**Random interval** (10-60000 ms) and clicks once at a random point. The button,
+session limit and start delay still apply. Points are kept 8 px away from the
+edges and cover every monitor, including negative virtual-desktop coordinates.
 
 ## Windows
 
@@ -189,16 +196,17 @@ v-autoclicker on --cps 20 --multi-click 2 --x 640 --y 360
 | `--hold-hotkey COMBO` | - | Windows hold-to-click key |
 | `--detach` | - | `daemon` only: continue in the background |
 
-Sequence mode and its interval are configured in the GUI.
+Sequence and random mode intervals are configured in the GUI.
 
 ## GUI and themes
 
-The GUI has two layouts. **Simple** keeps only Start/Stop, the status indicator,
-the mouse button and the CPS slider on one compact screen. **Advanced** is the
-full interface with the **Clicks**, **Mode**, **Hotkeys** and **System** tabs.
-The Simple/Advanced toggle is always visible in the top bar, and the choice is
-saved in `gui.toml`. The pin next to the status badge toggles **Always on top**;
-the same switch is available in the **System** tab.
+The GUI has two layouts. **Simple** keeps only Start/Stop, the session state,
+the mouse button and the speed slider on one compact screen; in Random mode the
+speed slider becomes the random interval. **Advanced** is the full interface
+with the **Clicks**, **Mode**, **Hotkeys** and **System** tabs. The
+Simple/Advanced toggle is always visible in the top bar, and the choice is saved
+in `gui.toml`. The pin in the top bar toggles **Always on top**; the same switch
+is available in the **System** tab.
 
 Always on top is supported on **Windows** and **Linux/X11**. On Wayland the
 compositor owns window stacking (and niri has no always-on-top action), so the
@@ -226,7 +234,16 @@ Available themes:
 
 | Light | Dark |
 |---|---|
-| Paper, Sand, Contrast, Rose, Lavender, Coffee, Glacier, Apricot, Mint | Graphite, Ocean, Forest, Midnight, Nord, Matcha, Ember, Plum, Wine |
+| Paper, Sand, Contrast, Rose, Lavender, Coffee, Glacier, Apricot, Mint, Liquid Glass | Graphite, Ocean, Forest, Midnight, Nord, Matcha, Ember, Plum, Wine |
+
+**Liquid Glass** is an experimental theme: a soft gradient backdrop with color
+blobs, translucent cards and rounded frosted surfaces. The glass is simulated
+inside the app, so it does not depend on OS blur and looks the same on every
+compositor.
+
+<p align="center">
+  <img src="docs/gui-glass.png" alt="V-AutoClicker Liquid Glass theme" width="460">
+</p>
 
 Languages: Auto, English, Русский, Deutsch, Français, Español, Português.
 Auto follows the system locale and falls back to English.

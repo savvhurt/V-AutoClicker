@@ -15,6 +15,7 @@ use super::config::Theme;
 #[derive(Clone, Copy)]
 struct Palette {
     dark: bool,
+    glass: bool,
     bg: Color32,
     panel: Color32,
     input: Color32,
@@ -30,6 +31,7 @@ struct Palette {
 
 const PAPER: Palette = Palette {
     dark: false,
+    glass: false,
     bg: Color32::from_rgb(243, 241, 235),
     panel: Color32::from_rgb(250, 249, 245),
     input: Color32::from_rgb(236, 233, 226),
@@ -45,6 +47,7 @@ const PAPER: Palette = Palette {
 
 const GRAPHITE: Palette = Palette {
     dark: true,
+    glass: false,
     bg: Color32::from_rgb(24, 24, 22),
     panel: Color32::from_rgb(33, 33, 30),
     input: Color32::from_rgb(43, 42, 38),
@@ -60,6 +63,7 @@ const GRAPHITE: Palette = Palette {
 
 const SAND: Palette = Palette {
     dark: false,
+    glass: false,
     bg: Color32::from_rgb(243, 235, 219),
     panel: Color32::from_rgb(250, 244, 232),
     input: Color32::from_rgb(235, 225, 205),
@@ -75,6 +79,7 @@ const SAND: Palette = Palette {
 
 const OCEAN: Palette = Palette {
     dark: true,
+    glass: false,
     bg: Color32::from_rgb(17, 26, 36),
     panel: Color32::from_rgb(24, 35, 47),
     input: Color32::from_rgb(32, 46, 60),
@@ -90,6 +95,7 @@ const OCEAN: Palette = Palette {
 
 const FOREST: Palette = Palette {
     dark: true,
+    glass: false,
     bg: Color32::from_rgb(19, 27, 22),
     panel: Color32::from_rgb(26, 36, 30),
     input: Color32::from_rgb(35, 48, 40),
@@ -105,6 +111,7 @@ const FOREST: Palette = Palette {
 
 const CONTRAST: Palette = Palette {
     dark: false,
+    glass: false,
     bg: Color32::from_rgb(255, 255, 255),
     panel: Color32::from_rgb(248, 248, 248),
     input: Color32::from_rgb(235, 235, 235),
@@ -120,6 +127,7 @@ const CONTRAST: Palette = Palette {
 
 const ROSE: Palette = Palette {
     dark: false,
+    glass: false,
     bg: Color32::from_rgb(250, 240, 241),
     panel: Color32::from_rgb(253, 247, 247),
     input: Color32::from_rgb(245, 229, 231),
@@ -135,6 +143,7 @@ const ROSE: Palette = Palette {
 
 const LAVENDER: Palette = Palette {
     dark: false,
+    glass: false,
     bg: Color32::from_rgb(243, 240, 250),
     panel: Color32::from_rgb(250, 248, 253),
     input: Color32::from_rgb(233, 228, 245),
@@ -150,6 +159,7 @@ const LAVENDER: Palette = Palette {
 
 const MIDNIGHT: Palette = Palette {
     dark: true,
+    glass: false,
     bg: Color32::from_rgb(14, 18, 32),
     panel: Color32::from_rgb(22, 28, 46),
     input: Color32::from_rgb(32, 40, 61),
@@ -165,6 +175,7 @@ const MIDNIGHT: Palette = Palette {
 
 const NORD: Palette = Palette {
     dark: true,
+    glass: false,
     bg: Color32::from_rgb(46, 52, 64),
     panel: Color32::from_rgb(53, 60, 74),
     input: Color32::from_rgb(59, 66, 82),
@@ -180,6 +191,7 @@ const NORD: Palette = Palette {
 
 const COFFEE: Palette = Palette {
     dark: false,
+    glass: false,
     bg: Color32::from_rgb(244, 237, 228),
     panel: Color32::from_rgb(251, 246, 239),
     input: Color32::from_rgb(237, 225, 211),
@@ -195,6 +207,7 @@ const COFFEE: Palette = Palette {
 
 const MATCHA: Palette = Palette {
     dark: true,
+    glass: false,
     bg: Color32::from_rgb(19, 26, 20),
     panel: Color32::from_rgb(27, 36, 28),
     input: Color32::from_rgb(37, 49, 38),
@@ -210,6 +223,7 @@ const MATCHA: Palette = Palette {
 
 const GLACIER: Palette = Palette {
     dark: false,
+    glass: false,
     bg: Color32::from_rgb(239, 244, 248),
     panel: Color32::from_rgb(248, 251, 253),
     input: Color32::from_rgb(228, 236, 243),
@@ -225,6 +239,7 @@ const GLACIER: Palette = Palette {
 
 const APRICOT: Palette = Palette {
     dark: false,
+    glass: false,
     bg: Color32::from_rgb(247, 239, 230),
     panel: Color32::from_rgb(252, 247, 241),
     input: Color32::from_rgb(240, 228, 214),
@@ -240,6 +255,7 @@ const APRICOT: Palette = Palette {
 
 const MINT: Palette = Palette {
     dark: false,
+    glass: false,
     bg: Color32::from_rgb(238, 244, 238),
     panel: Color32::from_rgb(247, 251, 247),
     input: Color32::from_rgb(226, 236, 227),
@@ -255,6 +271,7 @@ const MINT: Palette = Palette {
 
 const EMBER: Palette = Palette {
     dark: true,
+    glass: false,
     bg: Color32::from_rgb(30, 25, 22),
     panel: Color32::from_rgb(38, 32, 28),
     input: Color32::from_rgb(47, 40, 35),
@@ -270,6 +287,7 @@ const EMBER: Palette = Palette {
 
 const PLUM: Palette = Palette {
     dark: true,
+    glass: false,
     bg: Color32::from_rgb(32, 26, 38),
     panel: Color32::from_rgb(41, 33, 48),
     input: Color32::from_rgb(50, 40, 59),
@@ -285,6 +303,7 @@ const PLUM: Palette = Palette {
 
 const WINE: Palette = Palette {
     dark: true,
+    glass: false,
     bg: Color32::from_rgb(33, 22, 26),
     panel: Color32::from_rgb(43, 29, 34),
     input: Color32::from_rgb(52, 36, 42),
@@ -296,6 +315,25 @@ const WINE: Palette = Palette {
     warning: Color32::from_rgb(222, 172, 102),
     danger: Color32::from_rgb(214, 100, 96),
     accent: Color32::from_rgb(184, 90, 108),
+};
+
+// A simulated frosted-glass theme. The backdrop is drawn by
+// [`paint_backdrop`] and the cards float above it as translucent panes; no OS
+// blur is involved, so it renders identically through the software backend.
+const LIQUID_GLASS: Palette = Palette {
+    dark: false,
+    glass: true,
+    bg: Color32::from_rgb(233, 238, 250),
+    panel: Color32::from_rgb(250, 252, 255),
+    input: Color32::from_rgb(255, 255, 255),
+    line: Color32::from_rgb(255, 255, 255),
+    line_soft: Color32::from_rgb(255, 255, 255),
+    text: Color32::from_rgb(26, 30, 45),
+    muted: Color32::from_rgb(92, 100, 122),
+    dim: Color32::from_rgb(138, 146, 168),
+    warning: Color32::from_rgb(168, 105, 18),
+    danger: Color32::from_rgb(186, 55, 64),
+    accent: Color32::from_rgb(84, 122, 220),
 };
 
 const SANS_REGULAR: &str = "plex-sans-regular";
@@ -352,6 +390,7 @@ fn palette() -> Palette {
         Theme::Ember => EMBER,
         Theme::Plum => PLUM,
         Theme::Wine => WINE,
+        Theme::LiquidGlass => LIQUID_GLASS,
     }
 }
 
@@ -410,6 +449,26 @@ pub fn danger() -> Color32 {
     palette().danger
 }
 
+/// Fill for the root central panel. In the glass theme it stays transparent
+/// so [`paint_backdrop`] shows through; other themes keep the flat background.
+pub fn backdrop_fill() -> Color32 {
+    if palette().glass {
+        Color32::TRANSPARENT
+    } else {
+        palette().bg
+    }
+}
+
+/// Fill for full-width strips (the daemon footer) that sit on the backdrop.
+#[cfg(not(windows))]
+pub fn bar_fill() -> Color32 {
+    if palette().glass {
+        alpha(Color32::WHITE, 132)
+    } else {
+        palette().bg
+    }
+}
+
 pub fn sans(size: f32) -> FontId {
     FontId::new(size, FontFamily::Proportional)
 }
@@ -453,11 +512,83 @@ pub fn rule(ui: &mut egui::Ui) {
 
 /// A soft rounded surface used to group related controls.
 pub fn card() -> egui::Frame {
+    if palette().glass {
+        return egui::Frame::new()
+            .fill(alpha(Color32::WHITE, 150))
+            .stroke(Stroke::new(1.0_f32, alpha(Color32::WHITE, 210)))
+            .corner_radius(CornerRadius::same(16))
+            .inner_margin(Margin::symmetric(12, 8))
+            .shadow(Shadow {
+                offset: [0, 8],
+                blur: 24,
+                spread: 0,
+                color: Color32::from_black_alpha(24),
+            });
+    }
+
     egui::Frame::new()
         .fill(panel())
         .stroke(Stroke::new(1.0_f32, line_soft()))
         .corner_radius(CornerRadius::same(12))
         .inner_margin(Margin::symmetric(12, 8))
+}
+
+/// Paints the simulated liquid-glass backdrop: a soft four-corner gradient
+/// with a few blurred-looking color blobs. Other themes keep their flat fill,
+/// so this is a no-op unless the active palette sets `glass`.
+pub fn paint_backdrop(ui: &egui::Ui) {
+    if !palette().glass {
+        return;
+    }
+
+    let rect = ui.max_rect();
+    let painter = ui.painter();
+
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(rect.left_top(), Color32::from_rgb(226, 236, 252));
+    mesh.colored_vertex(rect.right_top(), Color32::from_rgb(238, 231, 250));
+    mesh.colored_vertex(rect.right_bottom(), Color32::from_rgb(246, 233, 238));
+    mesh.colored_vertex(rect.left_bottom(), Color32::from_rgb(229, 242, 246));
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    painter.add(egui::Shape::mesh(mesh));
+
+    let extent = rect.width().max(rect.height());
+    let blobs = [
+        (0.12, 0.08, 0.52, Color32::from_rgb(120, 170, 255)),
+        (0.94, 0.24, 0.44, Color32::from_rgb(196, 150, 255)),
+        (0.18, 0.94, 0.50, Color32::from_rgb(255, 176, 198)),
+        (0.86, 0.90, 0.42, Color32::from_rgb(150, 225, 215)),
+    ];
+    for (x, y, radius, color) in blobs {
+        let center = egui::pos2(
+            rect.left() + rect.width() * x,
+            rect.top() + rect.height() * y,
+        );
+        blob(painter, center, extent * radius, alpha(color, 48));
+    }
+}
+
+fn blob(painter: &egui::Painter, center: egui::Pos2, radius: f32, color: Color32) {
+    const SEGMENTS: usize = 32;
+    let mut mesh = egui::Mesh::default();
+    mesh.vertices.push(egui::epaint::Vertex {
+        pos: center,
+        uv: egui::epaint::WHITE_UV,
+        color,
+    });
+    for index in 0..=SEGMENTS {
+        let angle = index as f32 / SEGMENTS as f32 * std::f32::consts::TAU;
+        mesh.vertices.push(egui::epaint::Vertex {
+            pos: center + egui::vec2(angle.cos(), angle.sin()) * radius,
+            uv: egui::epaint::WHITE_UV,
+            color: Color32::TRANSPARENT,
+        });
+    }
+    for index in 1..=SEGMENTS {
+        mesh.add_triangle(0, index as u32, index as u32 + 1);
+    }
+    painter.add(egui::Shape::mesh(mesh));
 }
 
 /// A tinted strip for the current status notice.
@@ -596,6 +727,17 @@ fn visuals(palette: Palette) -> egui::Visuals {
     visuals.slider_trailing_fill = true;
     visuals.text_cursor.stroke = Stroke::new(1.5_f32, accent);
 
+    let idle_fill = if palette.glass {
+        alpha(Color32::WHITE, 168)
+    } else {
+        input
+    };
+    let idle_stroke = if palette.glass {
+        Stroke::new(1.0_f32, alpha(Color32::WHITE, 225))
+    } else {
+        Stroke::new(1.0_f32, line)
+    };
+
     let mut widgets = visuals.widgets.clone();
     widgets.noninteractive = egui::style::WidgetVisuals {
         bg_fill: bg,
@@ -606,32 +748,66 @@ fn visuals(palette: Palette) -> egui::Visuals {
         expansion: 0.0,
     };
     widgets.inactive = egui::style::WidgetVisuals {
-        bg_fill: input,
-        weak_bg_fill: input,
-        bg_stroke: Stroke::new(1.0_f32, line),
+        bg_fill: idle_fill,
+        weak_bg_fill: idle_fill,
+        bg_stroke: idle_stroke,
         corner_radius: CornerRadius::same(7),
         fg_stroke: Stroke::new(1.0_f32, text),
         expansion: 0.0,
     };
     widgets.hovered = egui::style::WidgetVisuals {
-        bg_fill: mix(input, accent, if dark { 0.14 } else { 0.08 }),
-        weak_bg_fill: mix(input, accent, if dark { 0.14 } else { 0.08 }),
+        bg_fill: if palette.glass {
+            alpha(mix(Color32::WHITE, accent, 0.12), 205)
+        } else {
+            mix(input, accent, if dark { 0.14 } else { 0.08 })
+        },
+        weak_bg_fill: if palette.glass {
+            alpha(mix(Color32::WHITE, accent, 0.12), 205)
+        } else {
+            mix(input, accent, if dark { 0.14 } else { 0.08 })
+        },
         bg_stroke: Stroke::new(1.0_f32, alpha(accent, 170)),
         corner_radius: CornerRadius::same(7),
         fg_stroke: Stroke::new(1.0_f32, text),
         expansion: 0.0,
     };
     widgets.active = egui::style::WidgetVisuals {
-        bg_fill: alpha(accent, if dark { 52 } else { 26 }),
-        weak_bg_fill: alpha(accent, if dark { 52 } else { 26 }),
+        bg_fill: alpha(
+            accent,
+            if palette.glass {
+                44
+            } else if dark {
+                52
+            } else {
+                26
+            },
+        ),
+        weak_bg_fill: alpha(
+            accent,
+            if palette.glass {
+                44
+            } else if dark {
+                52
+            } else {
+                26
+            },
+        ),
         bg_stroke: Stroke::new(1.0_f32, accent),
         corner_radius: CornerRadius::same(7),
         fg_stroke: Stroke::new(1.0_f32, text),
         expansion: 0.0,
     };
     widgets.open = egui::style::WidgetVisuals {
-        bg_fill: mix(input, accent, if dark { 0.18 } else { 0.10 }),
-        weak_bg_fill: mix(input, accent, if dark { 0.18 } else { 0.10 }),
+        bg_fill: if palette.glass {
+            alpha(mix(Color32::WHITE, accent, 0.16), 215)
+        } else {
+            mix(input, accent, if dark { 0.18 } else { 0.10 })
+        },
+        weak_bg_fill: if palette.glass {
+            alpha(mix(Color32::WHITE, accent, 0.16), 215)
+        } else {
+            mix(input, accent, if dark { 0.18 } else { 0.10 })
+        },
         bg_stroke: Stroke::new(1.0_f32, accent),
         corner_radius: CornerRadius::same(7),
         fg_stroke: Stroke::new(1.0_f32, text),

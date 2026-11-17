@@ -39,6 +39,24 @@ impl super::Backend for WindowsBackend {
     fn supports_target(&self) -> bool {
         true
     }
+
+    fn screen_bounds(&mut self) -> Result<super::ScreenBounds> {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+            SM_YVIRTUALSCREEN,
+        };
+
+        let bounds = super::ScreenBounds {
+            x: unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) },
+            y: unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) },
+            width: unsafe { GetSystemMetrics(SM_CXVIRTUALSCREEN) },
+            height: unsafe { GetSystemMetrics(SM_CYVIRTUALSCREEN) },
+        };
+        if bounds.is_empty() {
+            bail!("failed to read the virtual screen size");
+        }
+        Ok(bounds)
+    }
 }
 
 pub fn cursor_position() -> Result<Point> {

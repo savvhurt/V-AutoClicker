@@ -4,6 +4,22 @@ use anyhow::Result;
 
 use crate::state::{Button, Point};
 
+/// Bounding box of the whole virtual desktop in physical pixels. The origin can
+/// be negative when a secondary monitor sits left of or above the primary one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ScreenBounds {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+impl ScreenBounds {
+    pub fn is_empty(&self) -> bool {
+        self.width <= 0 || self.height <= 0
+    }
+}
+
 pub trait Backend: Send {
     fn press(&mut self, button: Button) -> Result<()>;
     fn release(&mut self, button: Button) -> Result<()>;
@@ -17,6 +33,12 @@ pub trait Backend: Send {
 
     fn supports_target(&self) -> bool {
         false
+    }
+
+    /// Size of the desktop used by the random mode. Backends that cannot warp
+    /// the cursor keep the default implementation.
+    fn screen_bounds(&mut self) -> Result<ScreenBounds> {
+        anyhow::bail!("random clicking is not supported on this platform")
     }
 }
 
