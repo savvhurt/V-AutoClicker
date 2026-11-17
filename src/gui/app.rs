@@ -730,6 +730,12 @@ impl GuiApp {
             Theme::Nord => Key::ThemeNord,
             Theme::Coffee => Key::ThemeCoffee,
             Theme::Matcha => Key::ThemeMatcha,
+            Theme::Glacier => Key::ThemeGlacier,
+            Theme::Apricot => Key::ThemeApricot,
+            Theme::Mint => Key::ThemeMint,
+            Theme::Ember => Key::ThemeEmber,
+            Theme::Plum => Key::ThemePlum,
+            Theme::Wine => Key::ThemeWine,
         })
     }
 
@@ -1777,7 +1783,7 @@ impl GuiApp {
 
                         let remaining = ui.available_width();
                         ui.allocate_ui_with_layout(
-                            Vec2::new(remaining, 22.0),
+                            Vec2::new(remaining, 20.0),
                             Layout::left_to_right(Align::Center),
                             |ui| {
                                 changed |= widgets::coordinate_field(ui, &mut point.x, "X");
@@ -1815,7 +1821,7 @@ impl GuiApp {
                         });
                         let remaining = ui.available_width();
                         ui.allocate_ui_with_layout(
-                            Vec2::new(remaining, 22.0),
+                            Vec2::new(remaining, 20.0),
                             Layout::left_to_right(Align::Center),
                             |ui| {
                                 changed |= widgets::coordinate_field(ui, &mut point_value.x, "X");
@@ -2733,13 +2739,13 @@ fn compact_slider_row(
         // Zero implicit spacing + explicit gaps keeps the right edge of the
         // input group exactly on the card grid for every suffix width.
         ui.spacing_mut().item_spacing.x = 0.0;
-        let _ = row_label(ui, title, hint, 22.0);
+        let _ = row_label(ui, title, hint, 20.0);
         ui.add_space(6.0);
 
         let field_width = widgets::numeric_row_width();
         let slider_width = (ui.available_width() - field_width - 6.0).max(60.0);
         ui.allocate_ui_with_layout(
-            Vec2::new(slider_width, 22.0),
+            Vec2::new(slider_width, 20.0),
             Layout::left_to_right(Align::Center),
             |ui| {
                 ui.spacing_mut().slider_width = slider_width;
@@ -2782,7 +2788,7 @@ fn compact_integer_row(
 
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        let _ = row_label(ui, title, hint, 22.0);
+        let _ = row_label(ui, title, hint, 20.0);
         ui.add_space(6.0);
 
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -2803,11 +2809,11 @@ fn compact_choice_row(
 
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        let _ = row_label(ui, title, hint, 22.0);
+        let _ = row_label(ui, title, hint, 20.0);
         ui.add_space(6.0);
 
         ui.allocate_ui_with_layout(
-            Vec2::new(ui.available_width(), 22.0),
+            Vec2::new(ui.available_width(), 20.0),
             Layout::left_to_right(Align::Center),
             |ui| changed = add(ui),
         );

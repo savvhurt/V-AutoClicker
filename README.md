@@ -18,7 +18,7 @@
 # V-AutoClicker
 
 **A fast, minimal, lightweight autoclicker written on Rust for Windows and Linux.**<br>
-Native input, three click modes, twelve themes, one small binary.
+Native input, three click modes, eighteen themes, one small binary.
 
 [Download](https://github.com/savvhurt/V-AutoClicker/releases/latest) ·
 [CLI](#cli) ·
@@ -40,7 +40,7 @@ Native input, three click modes, twelve themes, one small binary.
 - **Hold-to-click** on Windows with a second hotkey.
 - **Autostart** on both platforms, plus optional **minimize to tray** on Windows.
 - **Always on top** on Windows and X11, with a pin in the top bar.
-- **12 themes**, six interface languages and automatic DPI scaling.
+- **18 themes**, six interface languages and automatic DPI scaling.
 - **One binary**: no arguments opens the GUI, subcommands stay on the CLI.
 - Settings live in `gui.toml` and are saved automatically.
 
@@ -226,7 +226,7 @@ Available themes:
 
 | Light | Dark |
 |---|---|
-| Paper, Sand, Contrast, Rose, Lavender, Coffee | Graphite, Ocean, Forest, Midnight, Nord, Matcha |
+| Paper, Sand, Contrast, Rose, Lavender, Coffee, Glacier, Apricot, Mint | Graphite, Ocean, Forest, Midnight, Nord, Matcha, Ember, Plum, Wine |
 
 Languages: Auto, English, Русский, Deutsch, Français, Español, Português.
 Auto follows the system locale and falls back to English.

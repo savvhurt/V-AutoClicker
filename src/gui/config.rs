@@ -23,10 +23,16 @@ pub enum Theme {
     Nord,
     Coffee,
     Matcha,
+    Glacier,
+    Apricot,
+    Mint,
+    Ember,
+    Plum,
+    Wine,
 }
 
 impl Theme {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 18] = [
         Self::Paper,
         Self::Graphite,
         Self::Sand,
@@ -39,6 +45,12 @@ impl Theme {
         Self::Nord,
         Self::Coffee,
         Self::Matcha,
+        Self::Glacier,
+        Self::Apricot,
+        Self::Mint,
+        Self::Ember,
+        Self::Plum,
+        Self::Wine,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -55,6 +67,12 @@ impl Theme {
             Self::Nord => "nord",
             Self::Coffee => "coffee",
             Self::Matcha => "matcha",
+            Self::Glacier => "glacier",
+            Self::Apricot => "apricot",
+            Self::Mint => "mint",
+            Self::Ember => "ember",
+            Self::Plum => "plum",
+            Self::Wine => "wine",
         }
     }
 
@@ -74,6 +92,12 @@ impl Theme {
             "nord" | "норд" => Some(Self::Nord),
             "coffee" | "кофе" => Some(Self::Coffee),
             "matcha" | "матча" => Some(Self::Matcha),
+            "glacier" | "ледник" => Some(Self::Glacier),
+            "apricot" | "абрикос" => Some(Self::Apricot),
+            "mint" | "мята" => Some(Self::Mint),
+            "ember" | "угли" => Some(Self::Ember),
+            "plum" | "слива" => Some(Self::Plum),
+            "wine" | "вино" => Some(Self::Wine),
             _ => None,
         }
     }
@@ -92,6 +116,12 @@ impl Theme {
             Self::Nord => 9,
             Self::Coffee => 10,
             Self::Matcha => 11,
+            Self::Glacier => 12,
+            Self::Apricot => 13,
+            Self::Mint => 14,
+            Self::Ember => 15,
+            Self::Plum => 16,
+            Self::Wine => 17,
         }
     }
 
@@ -108,6 +138,9 @@ impl Theme {
                 | Self::Midnight
                 | Self::Nord
                 | Self::Matcha
+                | Self::Ember
+                | Self::Plum
+                | Self::Wine
         )
     }
 }
@@ -616,9 +649,16 @@ mod tests {
         assert_eq!(Theme::parse("норд"), Some(Theme::Nord));
         assert_eq!(Theme::parse("Coffee"), Some(Theme::Coffee));
         assert_eq!(Theme::parse("матча"), Some(Theme::Matcha));
+        assert_eq!(Theme::parse("Glacier"), Some(Theme::Glacier));
+        assert_eq!(Theme::parse("ледник"), Some(Theme::Glacier));
+        assert_eq!(Theme::parse("абрикос"), Some(Theme::Apricot));
+        assert_eq!(Theme::parse("MINT"), Some(Theme::Mint));
+        assert_eq!(Theme::parse("угли"), Some(Theme::Ember));
+        assert_eq!(Theme::parse("Plum"), Some(Theme::Plum));
+        assert_eq!(Theme::parse("вино"), Some(Theme::Wine));
         assert_eq!(Theme::parse("neon"), None);
 
-        assert_eq!(Theme::ALL.len(), 12);
+        assert_eq!(Theme::ALL.len(), 18);
         for theme in Theme::ALL {
             assert_eq!(Theme::parse(theme.as_str()), Some(theme));
             assert_eq!(Theme::from_index(theme.index()), theme);
@@ -636,6 +676,9 @@ mod tests {
                     | Theme::Midnight
                     | Theme::Nord
                     | Theme::Matcha
+                    | Theme::Ember
+                    | Theme::Plum
+                    | Theme::Wine
             );
             assert_eq!(theme.is_dark(), expected, "{theme:?}");
         }

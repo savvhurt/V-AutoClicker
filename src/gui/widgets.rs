@@ -5,14 +5,14 @@ use egui::{
 
 use super::theme;
 
-pub const FIELD_WIDTH: f32 = 96.0;
-pub const FIELD_HEIGHT: f32 = 24.0;
-const FIELD_PADDING: f32 = 4.0;
+pub const FIELD_WIDTH: f32 = 78.0;
+pub const FIELD_HEIGHT: f32 = 20.0;
+const FIELD_PADDING: f32 = 3.0;
 /// Fixed width for the unit label inside a numeric field. Reserving the same
 /// slot for `CPS`, `MS`, `%`, `X` and `Y` keeps every field box and slider end
 /// aligned instead of shifting with the suffix width.
-const SUFFIX_SLOT: f32 = 22.0;
-const INPUT_GAP: f32 = 4.0;
+const SUFFIX_SLOT: f32 = 20.0;
+const INPUT_GAP: f32 = 3.0;
 const INPUT_WIDTH: f32 = FIELD_WIDTH + INPUT_GAP + SUFFIX_SLOT;
 
 pub fn status_badge(ui: &mut Ui, text: &str, dot: Color32, pulse: bool) -> Response {
@@ -405,7 +405,7 @@ fn configure_field_child(ui: &mut Ui, rect: Rect) -> Ui {
             .layout(Layout::right_to_left(Align::Center)),
     );
     child.style_mut().override_text_style = Some(TextStyle::Monospace);
-    child.style_mut().override_font_id = Some(theme::mono_medium(12.5));
+    child.style_mut().override_font_id = Some(theme::mono_medium(11.5));
     child.spacing_mut().interact_size =
         Vec2::new(FIELD_WIDTH - 2.0 * FIELD_PADDING, FIELD_HEIGHT - 2.0);
     child.spacing_mut().button_padding = Vec2::new(FIELD_PADDING, 1.0);
@@ -435,7 +435,7 @@ fn add_field(ui: &mut Ui, suffix: &str, value: impl egui::widgets::Widget) -> bo
 
     let galley =
         ui.painter()
-            .layout_no_wrap(suffix.to_owned(), theme::mono_medium(9.0), theme::dim());
+            .layout_no_wrap(suffix.to_owned(), theme::mono_medium(8.5), theme::dim());
     ui.painter().galley(
         pos2(
             rect.right() - INPUT_GAP - galley.size().x,

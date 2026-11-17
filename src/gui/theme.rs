@@ -10,7 +10,8 @@ use super::config::Theme;
 
 // Each palette keeps the same signal accent for active clicks while the
 // surrounding surface changes: paper, graphite, sand, ocean, forest, contrast,
-// rose, lavender, midnight, nord, coffee or matcha.
+// rose, lavender, midnight, nord, coffee, matcha, glacier, apricot, mint,
+// ember, plum or wine.
 #[derive(Clone, Copy)]
 struct Palette {
     dark: bool,
@@ -207,6 +208,96 @@ const MATCHA: Palette = Palette {
     accent: Color32::from_rgb(141, 187, 106),
 };
 
+const GLACIER: Palette = Palette {
+    dark: false,
+    bg: Color32::from_rgb(239, 244, 248),
+    panel: Color32::from_rgb(248, 251, 253),
+    input: Color32::from_rgb(228, 236, 243),
+    line: Color32::from_rgb(196, 209, 221),
+    line_soft: Color32::from_rgb(216, 226, 235),
+    text: Color32::from_rgb(20, 32, 43),
+    muted: Color32::from_rgb(78, 96, 111),
+    dim: Color32::from_rgb(128, 145, 160),
+    warning: Color32::from_rgb(150, 92, 12),
+    danger: Color32::from_rgb(176, 52, 52),
+    accent: Color32::from_rgb(56, 127, 168),
+};
+
+const APRICOT: Palette = Palette {
+    dark: false,
+    bg: Color32::from_rgb(247, 239, 230),
+    panel: Color32::from_rgb(252, 247, 241),
+    input: Color32::from_rgb(240, 228, 214),
+    line: Color32::from_rgb(219, 201, 182),
+    line_soft: Color32::from_rgb(238, 226, 213),
+    text: Color32::from_rgb(43, 31, 22),
+    muted: Color32::from_rgb(111, 88, 68),
+    dim: Color32::from_rgb(156, 133, 112),
+    warning: Color32::from_rgb(152, 92, 12),
+    danger: Color32::from_rgb(170, 58, 44),
+    accent: Color32::from_rgb(192, 106, 43),
+};
+
+const MINT: Palette = Palette {
+    dark: false,
+    bg: Color32::from_rgb(238, 244, 238),
+    panel: Color32::from_rgb(247, 251, 247),
+    input: Color32::from_rgb(226, 236, 227),
+    line: Color32::from_rgb(195, 214, 198),
+    line_soft: Color32::from_rgb(218, 231, 220),
+    text: Color32::from_rgb(22, 36, 26),
+    muted: Color32::from_rgb(81, 104, 84),
+    dim: Color32::from_rgb(134, 156, 137),
+    warning: Color32::from_rgb(146, 95, 15),
+    danger: Color32::from_rgb(170, 56, 56),
+    accent: Color32::from_rgb(62, 138, 99),
+};
+
+const EMBER: Palette = Palette {
+    dark: true,
+    bg: Color32::from_rgb(30, 25, 22),
+    panel: Color32::from_rgb(38, 32, 28),
+    input: Color32::from_rgb(47, 40, 35),
+    line: Color32::from_rgb(69, 58, 50),
+    line_soft: Color32::from_rgb(52, 44, 38),
+    text: Color32::from_rgb(242, 234, 228),
+    muted: Color32::from_rgb(184, 169, 158),
+    dim: Color32::from_rgb(138, 122, 110),
+    warning: Color32::from_rgb(226, 176, 114),
+    danger: Color32::from_rgb(209, 107, 96),
+    accent: Color32::from_rgb(224, 139, 74),
+};
+
+const PLUM: Palette = Palette {
+    dark: true,
+    bg: Color32::from_rgb(32, 26, 38),
+    panel: Color32::from_rgb(41, 33, 48),
+    input: Color32::from_rgb(50, 40, 59),
+    line: Color32::from_rgb(70, 58, 81),
+    line_soft: Color32::from_rgb(54, 44, 63),
+    text: Color32::from_rgb(239, 232, 245),
+    muted: Color32::from_rgb(185, 169, 198),
+    dim: Color32::from_rgb(139, 122, 153),
+    warning: Color32::from_rgb(217, 176, 111),
+    danger: Color32::from_rgb(212, 117, 138),
+    accent: Color32::from_rgb(176, 127, 208),
+};
+
+const WINE: Palette = Palette {
+    dark: true,
+    bg: Color32::from_rgb(33, 22, 26),
+    panel: Color32::from_rgb(43, 29, 34),
+    input: Color32::from_rgb(52, 36, 42),
+    line: Color32::from_rgb(73, 52, 59),
+    line_soft: Color32::from_rgb(56, 39, 45),
+    text: Color32::from_rgb(243, 232, 235),
+    muted: Color32::from_rgb(190, 167, 173),
+    dim: Color32::from_rgb(143, 118, 125),
+    warning: Color32::from_rgb(222, 172, 102),
+    danger: Color32::from_rgb(214, 100, 96),
+    accent: Color32::from_rgb(184, 90, 108),
+};
+
 const SANS_REGULAR: &str = "plex-sans-regular";
 const SANS_MEDIUM: &str = "plex-sans-medium";
 const SANS_SEMIBOLD: &str = "plex-sans-semibold";
@@ -255,6 +346,12 @@ fn palette() -> Palette {
         Theme::Nord => NORD,
         Theme::Coffee => COFFEE,
         Theme::Matcha => MATCHA,
+        Theme::Glacier => GLACIER,
+        Theme::Apricot => APRICOT,
+        Theme::Mint => MINT,
+        Theme::Ember => EMBER,
+        Theme::Plum => PLUM,
+        Theme::Wine => WINE,
     }
 }
 
