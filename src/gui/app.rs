@@ -739,7 +739,7 @@ impl GuiApp {
         }
 
         match update::install(&bytes) {
-            Ok(_) => match update::relaunch() {
+            Ok(executable) => match update::relaunch(&executable) {
                 Ok(()) => {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }

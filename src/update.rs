@@ -339,9 +339,32 @@ fn sha256_hex(bytes: &[u8]) -> String {
 /// on Windows the running image is first renamed aside because a loaded
 /// executable cannot be overwritten.
 pub fn install(bytes: &[u8]) -> Result<PathBuf> {
-    let target = env::current_exe().context("cannot resolve the current executable path")?;
+    let target = current_executable()?;
     replace_binary(&target, bytes)?;
     Ok(target)
+}
+
+/// Resolve the installed executable, tolerating the ` (deleted)` suffix that
+/// Linux reports after a running binary has been replaced.
+fn current_executable() -> Result<PathBuf> {
+    let executable = env::current_exe().context("cannot resolve the current executable path")?;
+    Ok(resolve_executable(executable))
+}
+
+fn resolve_executable(executable: PathBuf) -> PathBuf {
+    let Some(stripped) = executable
+        .to_str()
+        .and_then(|path| path.strip_suffix(" (deleted)"))
+    else {
+        return executable;
+    };
+
+    let stripped = PathBuf::from(stripped);
+    if stripped.is_file() {
+        stripped
+    } else {
+        executable
+    }
 }
 
 fn replace_binary(target: &Path, bytes: &[u8]) -> Result<()> {
@@ -413,8 +436,10 @@ fn write_staged(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 /// Start a fresh copy of the installed executable.
-pub fn relaunch() -> Result<()> {
-    let executable = env::current_exe().context("cannot resolve the current executable path")?;
+///
+/// The path must be the one returned by [`install`]: after the replacement
+/// `current_exe()` resolves to an unlinked file with a ` (deleted)` suffix.
+pub fn relaunch(executable: &Path) -> Result<()> {
     let mut command = std::process::Command::new(executable);
     command
         .stdin(std::process::Stdio::null())
@@ -660,6 +685,28 @@ mod tests {
             Some("v-autoclicker-windows-x86_64.exe")
         );
         assert_eq!(asset_name_for("macos", "aarch64"), None);
+    }
+
+    #[test]
+    fn deleted_suffix_resolves_to_the_installed_file() {
+        let directory = env::temp_dir().join(format!(
+            "v-autoclicker-deleted-test-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir_all(&directory).unwrap();
+        let target = directory.join("v-autoclicker");
+        fs::write(&target, b"binary").unwrap();
+
+        let deleted = PathBuf::from(format!("{} (deleted)", target.display()));
+        assert_eq!(resolve_executable(deleted), target);
+
+        let missing = directory.join("missing");
+        let deleted = PathBuf::from(format!("{} (deleted)", missing.display()));
+        assert_eq!(resolve_executable(deleted.clone()), deleted);
+
+        let _ = fs::remove_dir_all(&directory);
     }
 
     #[test]
