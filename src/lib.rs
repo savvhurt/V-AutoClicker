@@ -12,3 +12,5 @@ pub mod ipc;
 pub mod platform;
 pub mod scheduler;
 pub mod state;
+#[cfg(feature = "gui")]
+pub mod update;

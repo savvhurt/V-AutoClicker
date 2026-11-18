@@ -18,6 +18,7 @@ use crate::state::{
     Button, ClickMode, MAX_DELAY_MS, MAX_LIMIT, MAX_POINT_INTERVAL_MS, MAX_POINTS,
     MAX_RANDOM_INTERVAL_MS, MIN_RANDOM_INTERVAL_MS, Point, Settings, Status, StopReason,
 };
+use crate::update::{self, Release};
 
 const APPLY_DEBOUNCE: Duration = Duration::from_millis(250);
 const SYNC_GRACE: Duration = Duration::from_millis(800);
@@ -68,6 +69,25 @@ enum PipetteTarget {
 struct Pipette {
     target: PipetteTarget,
     receiver: Receiver<std::result::Result<Option<Point>, String>>,
+}
+
+/// State of the System tab's update controls. All network work happens on a
+/// background thread and reports back through `UpdateEvent`.
+enum UpdateState {
+    Idle,
+    Checking,
+    UpToDate,
+    Available(Release),
+    Downloading { progress: f32 },
+    Ready { release: Release, bytes: Vec<u8> },
+    Installing,
+    Failed(String),
+}
+
+enum UpdateEvent {
+    Checked(std::result::Result<Option<Release>, String>),
+    Progress(f32),
+    Downloaded(std::result::Result<(Release, Vec<u8>), (Release, String)>),
 }
 
 struct SliderSpec<'a> {
@@ -199,6 +219,13 @@ pub struct GuiApp {
     simple_mode: bool,
     always_on_top: bool,
     minimize_to_tray: bool,
+    check_updates: bool,
+    update: UpdateState,
+    update_events: Receiver<UpdateEvent>,
+    update_sender: Sender<UpdateEvent>,
+    auto_check_pending: bool,
+    auto_check_at: Option<Instant>,
+    confirm_update: bool,
     #[cfg_attr(not(windows), allow(dead_code))]
     start_hidden: bool,
     #[cfg(windows)]
@@ -263,6 +290,10 @@ impl GuiApp {
         .expect("failed to start the V-AutoClicker GUI IPC worker");
         let worker_stop = worker.stop_flag();
         let autostart_enabled = crate::autostart::is_enabled();
+        let (update_sender, update_events) = mpsc::channel();
+        // A stale `.old-` or `.new-` file from an interrupted update can be
+        // removed before the next install starts.
+        update::cleanup_stale_files();
 
         #[cfg_attr(not(windows), allow(unused_mut))]
         let mut app = Self {
@@ -280,6 +311,14 @@ impl GuiApp {
             // switching back to X11 or Windows restores it at startup.
             always_on_top: config.always_on_top,
             minimize_to_tray: config.minimize_to_tray,
+            check_updates: config.check_updates,
+            update: UpdateState::Idle,
+            update_events,
+            update_sender,
+            auto_check_pending: false,
+            auto_check_at: (config.check_updates && update_supported())
+                .then(|| Instant::now() + Duration::from_secs(1)),
+            confirm_update: false,
             start_hidden,
             #[cfg(windows)]
             elevated: crate::platform::is_elevated(),
@@ -540,6 +579,390 @@ impl GuiApp {
         }
     }
 
+    /// Drain update events and start the delayed startup check when enabled.
+    fn poll_updates(&mut self, ctx: &egui::Context) {
+        if let Some(at) = self.auto_check_at {
+            let now = Instant::now();
+            if now >= at {
+                self.auto_check_at = None;
+                if self.check_updates {
+                    self.start_update_check(ctx, true);
+                }
+            } else {
+                ctx.request_repaint_after(at - now);
+            }
+        }
+
+        while let Ok(event) = self.update_events.try_recv() {
+            match event {
+                UpdateEvent::Checked(result) => {
+                    let automatic = std::mem::take(&mut self.auto_check_pending);
+                    self.update = match result {
+                        Ok(Some(release)) => UpdateState::Available(release),
+                        Ok(None) => UpdateState::UpToDate,
+                        Err(_) if automatic => {
+                            // A startup check must never interrupt the user
+                            // with a network error.
+                            UpdateState::Idle
+                        }
+                        Err(error) => {
+                            UpdateState::Failed(self.fill(Key::UpdateCheckFailed, &[error]))
+                        }
+                    };
+                }
+                UpdateEvent::Progress(fraction) => {
+                    if let UpdateState::Downloading { progress } = &mut self.update {
+                        *progress = fraction;
+                    }
+                }
+                UpdateEvent::Downloaded(result) => {
+                    self.update = match result {
+                        Ok((release, bytes)) => UpdateState::Ready { release, bytes },
+                        Err((release, error)) => {
+                            self.notice = Some(self.fill(Key::UpdateDownloadFailed, &[error]));
+                            UpdateState::Available(release)
+                        }
+                    };
+                }
+            }
+        }
+
+        if matches!(
+            self.update,
+            UpdateState::Checking | UpdateState::Downloading { .. } | UpdateState::Installing
+        ) {
+            ctx.request_repaint_after(Duration::from_millis(100));
+        }
+    }
+
+    fn start_update_check(&mut self, ctx: &egui::Context, automatic: bool) {
+        if matches!(
+            self.update,
+            UpdateState::Checking | UpdateState::Downloading { .. } | UpdateState::Installing
+        ) {
+            return;
+        }
+
+        self.auto_check_pending = automatic;
+        self.update = UpdateState::Checking;
+        let sender = self.update_sender.clone();
+        let ctx = ctx.clone();
+        let spawned = thread::Builder::new()
+            .name("v-autoclicker-update-check".to_string())
+            .spawn(move || {
+                let result = update::check().map_err(|error| format!("{error:#}"));
+                let _ = sender.send(UpdateEvent::Checked(result));
+                ctx.request_repaint();
+            });
+
+        if let Err(error) = spawned {
+            let detail = format!("{error}");
+            self.notice = Some(self.fill(Key::UpdateCheckFailed, &[detail]));
+            self.update = UpdateState::Idle;
+        }
+    }
+
+    fn start_update_download(&mut self, ctx: &egui::Context) {
+        let UpdateState::Available(release) = &self.update else {
+            return;
+        };
+        let release = release.clone();
+        self.update = UpdateState::Downloading { progress: 0.0 };
+        let fallback = release.clone();
+
+        let sender = self.update_sender.clone();
+        let progress_sender = sender.clone();
+        let progress_ctx = ctx.clone();
+        let thread_ctx = ctx.clone();
+        let spawned = thread::Builder::new()
+            .name("v-autoclicker-update-download".to_string())
+            .spawn(move || {
+                let mut last = -1.0f32;
+                let result = update::download(&release, &mut |fraction| {
+                    if fraction - last >= 0.01 || fraction >= 1.0 {
+                        last = fraction;
+                        let _ = progress_sender.send(UpdateEvent::Progress(fraction));
+                        progress_ctx.request_repaint();
+                    }
+                });
+                let event = match result {
+                    Ok(bytes) => UpdateEvent::Downloaded(Ok((release, bytes))),
+                    Err(error) => UpdateEvent::Downloaded(Err((release, format!("{error:#}")))),
+                };
+                let _ = sender.send(event);
+                thread_ctx.request_repaint();
+            });
+
+        if let Err(error) = spawned {
+            let detail = format!("{error}");
+            self.notice = Some(self.fill(Key::UpdateDownloadFailed, &[detail]));
+            self.update = UpdateState::Available(fallback);
+        }
+    }
+
+    /// Stop the daemon, replace the executable and relaunch the app.
+    fn install_update(&mut self, ctx: &egui::Context) {
+        if !matches!(self.update, UpdateState::Ready { .. }) {
+            return;
+        }
+        let UpdateState::Ready { release, bytes } =
+            std::mem::replace(&mut self.update, UpdateState::Installing)
+        else {
+            unreachable!("state was checked above");
+        };
+
+        self.save_config();
+        self.notice = Some(self.t(Key::UpdateInstalling).to_string());
+        self.auto_check_at = None;
+
+        // Let the worker stop clicking, resume the hotkey and shut the daemon
+        // down before the binary it runs is replaced. On Linux the daemon
+        // outlives the window, so it needs an explicit QUIT first.
+        #[cfg(not(windows))]
+        let _ = self.commands.send(Command::QuitDaemon);
+        let _ = self.commands.send(Command::Shutdown);
+        if let Some(handle) = self.worker.take() {
+            let _ = handle.join();
+        }
+        self.online = false;
+        self.initialized = false;
+
+        // The new window spawns a fresh daemon. Wait for the old one to release
+        // its socket or pipe, otherwise the replacement could talk to the old
+        // process instead.
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            if crate::ipc::send("STATUS").is_err() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+
+        match update::install(&bytes) {
+            Ok(_) => match update::relaunch() {
+                Ok(()) => {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                Err(error) => {
+                    self.restart_worker(ctx);
+                    self.notice =
+                        Some(self.fill(Key::UpdateRestartFailed, &[format!("{error:#}")]));
+                    self.update = UpdateState::Ready { release, bytes };
+                }
+            },
+            Err(error) => {
+                self.restart_worker(ctx);
+                self.notice = Some(self.fill(Key::UpdateInstallFailed, &[format!("{error:#}")]));
+                self.update = UpdateState::Ready { release, bytes };
+            }
+        }
+    }
+
+    fn draw_update_confirmation(&mut self, ctx: &egui::Context) {
+        if !self.confirm_update {
+            return;
+        }
+
+        match self.confirmation_modal(
+            ctx,
+            Confirmation {
+                id: "install_update",
+                title: Key::UpdateConfirmTitle,
+                question: Key::UpdateConfirmQuestion,
+                text: Key::UpdateConfirmText,
+                confirm: Key::UpdateConfirm,
+                solid: false,
+            },
+        ) {
+            Some(true) => {
+                self.confirm_update = false;
+                self.install_update(ctx);
+            }
+            Some(false) => self.confirm_update = false,
+            None => {}
+        }
+    }
+
+    fn draw_update_section(&mut self, ui: &mut Ui) {
+        theme::rule(ui);
+        ui.add_space(2.0);
+
+        let version = format!("v{}", update::CURRENT_VERSION);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            let _ = row_label(ui, self.t(Key::RowUpdates), self.t(Key::HintUpdates), 20.0);
+            ui.add_space(6.0);
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.label(
+                    RichText::new(&version)
+                        .font(theme::mono(9.5))
+                        .color(theme::muted()),
+                );
+            });
+        });
+        ui.add_space(2.0);
+
+        let mut check_clicked = false;
+        let mut install_clicked = false;
+        let mut download_clicked = false;
+        let mut open_notes: Option<String> = None;
+        let mut status: Option<(String, Color32)> = None;
+        let mut show_check = false;
+        let mut show_install = false;
+        let mut notes_url: Option<String> = None;
+        let ready = matches!(self.update, UpdateState::Ready { .. });
+
+        if !update_supported() {
+            status = Some((
+                self.t(Key::UpdatePlatformUnavailable).to_string(),
+                theme::muted(),
+            ));
+        } else {
+            match &self.update {
+                UpdateState::Idle => show_check = true,
+                UpdateState::Checking => {
+                    status = Some((self.t(Key::UpdateChecking).to_string(), theme::muted()));
+                }
+                UpdateState::UpToDate => {
+                    status = Some((self.t(Key::UpdateCurrent).to_string(), theme::muted()));
+                    show_check = true;
+                }
+                UpdateState::Available(release) => {
+                    status = Some((
+                        self.fill(Key::UpdateAvailable, &[release.version.to_string()]),
+                        theme::accent(),
+                    ));
+                    show_install = true;
+                    notes_url = Some(release.page_url.clone());
+                }
+                UpdateState::Ready { release, .. } => {
+                    status = Some((self.t(Key::UpdateReady).to_string(), theme::accent()));
+                    show_install = true;
+                    notes_url = Some(release.page_url.clone());
+                }
+                UpdateState::Downloading { progress } => {
+                    let percent = (progress * 100.0).round().clamp(0.0, 100.0) as u32;
+                    status = Some((
+                        self.fill(Key::UpdateDownloading, &[percent.to_string()]),
+                        theme::muted(),
+                    ));
+                }
+                UpdateState::Installing => {
+                    status = Some((self.t(Key::UpdateInstalling).to_string(), theme::warning()));
+                }
+                UpdateState::Failed(message) => {
+                    status = Some((message.clone(), theme::warning()));
+                    show_check = true;
+                }
+            }
+        }
+
+        if let Some((text, color)) = &status {
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::Label::new(RichText::new(text).font(theme::sans(10.5)).color(*color))
+                        .wrap(),
+                );
+            });
+            ui.add_space(2.0);
+        }
+
+        if show_install || show_check || notes_url.is_some() {
+            ui.horizontal(|ui| {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if show_install {
+                        ui.add_enabled_ui(!cfg!(debug_assertions), |ui| {
+                            if widgets::text_button(
+                                ui,
+                                self.t(Key::UpdateInstall),
+                                theme::accent(),
+                                theme::accent(),
+                            )
+                            .clicked()
+                            {
+                                if ready {
+                                    install_clicked = true;
+                                } else {
+                                    download_clicked = true;
+                                }
+                            }
+                        });
+                    }
+
+                    if let Some(url) = &notes_url {
+                        if widgets::text_button(
+                            ui,
+                            self.t(Key::UpdateNotes),
+                            theme::muted(),
+                            theme::text(),
+                        )
+                        .clicked()
+                        {
+                            open_notes = Some(url.clone());
+                        }
+                    }
+
+                    if show_check
+                        && widgets::text_button(
+                            ui,
+                            self.t(Key::UpdateCheck),
+                            theme::muted(),
+                            theme::accent(),
+                        )
+                        .clicked()
+                    {
+                        check_clicked = true;
+                    }
+                });
+            });
+        }
+
+        if cfg!(debug_assertions) && show_install {
+            ui.add_space(2.0);
+            ui.label(
+                RichText::new(self.t(Key::UpdateDevBuild))
+                    .font(theme::sans(10.0))
+                    .color(theme::warning()),
+            );
+        }
+
+        ui.add_space(3.0);
+        let mut enabled = self.check_updates;
+        let changed = compact_choice_row(
+            ui,
+            self.t(Key::UpdateCheckOnStart),
+            self.t(Key::UpdateCheckOnStartHint),
+            |ui| {
+                widgets::checkbox(ui, &mut enabled, self.t(Key::Enabled));
+                enabled != self.check_updates
+            },
+        );
+        if changed {
+            self.check_updates = enabled;
+            if enabled {
+                self.auto_check_at = Some(Instant::now());
+            } else {
+                self.auto_check_at = None;
+            }
+            self.save_config();
+        }
+
+        if check_clicked {
+            self.start_update_check(ui.ctx(), false);
+        }
+        if download_clicked {
+            self.start_update_download(ui.ctx());
+        }
+        if install_clicked {
+            self.confirm_update = true;
+        }
+        if let Some(url) = open_notes {
+            if let Err(error) = crate::platform::open_url(&url) {
+                self.notice = Some(format!("{error:#}"));
+            }
+        }
+    }
+
     fn apply_status(&mut self, status: Status) {
         let first_status = !self.initialized;
         let draft_was_dirty = self.draft_changed_at.is_some();
@@ -697,6 +1120,7 @@ impl GuiApp {
                 simple_mode: self.simple_mode,
                 always_on_top: self.always_on_top,
                 minimize_to_tray: self.minimize_to_tray,
+                check_updates: self.check_updates,
             })
     }
 
@@ -2142,6 +2566,8 @@ impl GuiApp {
             }
         }
 
+        self.draw_update_section(ui);
+
         theme::rule(ui);
         ui.add_space(2.0);
         if widgets::text_button(
@@ -2559,6 +2985,7 @@ impl egui_software_backend::App for GuiApp {
         self.drain_events(ui.ctx());
         self.check_worker_health(ui.ctx());
         self.maybe_apply_settings();
+        self.poll_updates(ui.ctx());
 
         theme::paint_backdrop(ui);
 
@@ -2628,6 +3055,7 @@ impl egui_software_backend::App for GuiApp {
         #[cfg(not(windows))]
         self.draw_quit_confirmation(ui.ctx());
         self.draw_defaults_confirmation(ui.ctx());
+        self.draw_update_confirmation(ui.ctx());
 
         // The debounce needs its own wake-up: the software backend waits for
         // events, so an idle window would otherwise not apply or save the
@@ -2832,6 +3260,10 @@ fn compact_integer_row(
     });
 
     changed
+}
+
+fn update_supported() -> bool {
+    crate::update::asset_name_for(std::env::consts::OS, std::env::consts::ARCH).is_some()
 }
 
 fn compact_choice_row(

@@ -56,12 +56,16 @@ jobs:
           Copy-Item README.md dist/
           Copy-Item assets/fonts/LICENSE.txt dist/FONT-LICENSE.txt
           Compress-Archive -Path dist/* -DestinationPath v-autoclicker-windows-x86_64.zip
+          # Raw executable for the in-app updater.
+          Copy-Item target/release/v-autoclicker.exe v-autoclicker-windows-x86_64.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: v-autoclicker-windows-x86_64
-          path: v-autoclicker-windows-x86_64.zip
+          path: |
+            v-autoclicker-windows-x86_64.zip
+            v-autoclicker-windows-x86_64.exe
           if-no-files-found: error
 
   linux:
@@ -102,12 +106,16 @@ jobs:
           cp assets/fonts/LICENSE.txt dist/v-autoclicker-linux-x86_64/FONT-LICENSE.txt
           chmod +x dist/v-autoclicker-linux-x86_64/v-autoclicker
           tar -C dist -czf v-autoclicker-linux-x86_64.tar.gz v-autoclicker-linux-x86_64
+          # Raw binary for the in-app updater.
+          cp target/release/v-autoclicker v-autoclicker-linux-x86_64
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: v-autoclicker-linux-x86_64
-          path: v-autoclicker-linux-x86_64.tar.gz
+          path: |
+            v-autoclicker-linux-x86_64.tar.gz
+            v-autoclicker-linux-x86_64
           if-no-files-found: error
 
   publish:
@@ -139,6 +147,14 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      # The in-app updater downloads the raw binary and verifies it against
+      # this file before replacing the running executable.
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum v-autoclicker-* | sort -k2 > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Attach archives to the release
         uses: softprops/action-gh-release@v2

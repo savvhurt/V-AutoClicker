@@ -41,6 +41,8 @@ Native input, four click modes, nineteen themes, one small binary.
 - **Hold-to-click** on Windows with a second hotkey.
 - **Autostart** on both platforms, plus optional **minimize to tray** on Windows.
 - **Always on top** on Windows and X11, with a pin in the top bar.
+- **Built-in updates**: the System tab checks GitHub, verifies the SHA-256 and
+  installs a new version in place.
 - **19 themes**, including the experimental **Liquid Glass**, six interface
   languages and automatic DPI scaling.
 - **One binary**: no arguments opens the GUI, subcommands stay on the CLI.
@@ -252,6 +254,27 @@ Settings are stored in:
 
 - Linux: `~/.config/v-autoclicker/gui.toml`
 - Windows: `%APPDATA%\V-AutoClicker\gui.toml`
+
+### Updates
+
+The **System** tab has an **Updates** row with the current version, a
+**Check for updates** button and a **Check at startup** switch (enabled by
+default). The check reads the latest GitHub release. A failing startup check
+stays silent; only a manual check shows the error.
+
+When a newer version exists, **Release notes** opens the GitHub page and
+**Install update** downloads the raw binary and verifies it against the
+published `SHA256SUMS` file. Installing asks for confirmation, stops clicking,
+shuts the daemon down and restarts the app with the new binary:
+
+- On Linux the running executable is replaced atomically. Its directory must be
+  writable; for example, installing to `/usr/local/bin` without permission
+  reports an error instead of asking for a password.
+- On Windows the running `.exe` is renamed aside, the new one is put in its
+  place, and the leftover file is removed on the next launch. SmartScreen may
+  warn because the binary is not code-signed.
+
+Development builds (`cargo run`) can check for updates but cannot install them.
 
 ## Build from source
 

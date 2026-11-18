@@ -929,6 +929,183 @@ define_strings! {
         "Inicia la aplicación desde el ejecutable actual. Vuelve a activarlo si mueves el binario.",
         "Inicia a aplicação a partir do executável atual. Reative após mover o binário."
     ],
+    RowUpdates: ["Updates", "Обновления", "Updates", "Mises à jour", "Actualizaciones", "Atualizações"],
+    HintUpdates: [
+        "Check GitHub for a newer release",
+        "Проверить на GitHub новую версию",
+        "Auf GitHub nach einer neueren Version suchen",
+        "Rechercher une version plus récente sur GitHub",
+        "Buscar una versión más reciente en GitHub",
+        "Procurar uma versão mais recente no GitHub"
+    ],
+    UpdateCheck: [
+        "Check for updates",
+        "Проверить обновления",
+        "Nach Updates suchen",
+        "Rechercher des mises à jour",
+        "Buscar actualizaciones",
+        "Verificar atualizações"
+    ],
+    UpdateChecking: [
+        "Checking…",
+        "Проверка…",
+        "Wird geprüft…",
+        "Vérification…",
+        "Comprobando…",
+        "Verificando…"
+    ],
+    UpdateCurrent: [
+        "You have the latest version",
+        "У вас последняя версия",
+        "Sie haben die neueste Version",
+        "Vous avez la dernière version",
+        "Tiene la última versión",
+        "Tem a versão mais recente"
+    ],
+    UpdateAvailable: [
+        "Version {} is available",
+        "Доступна версия {}",
+        "Version {} ist verfügbar",
+        "La version {} est disponible",
+        "La versión {} está disponible",
+        "A versão {} está disponível"
+    ],
+    UpdateNotes: [
+        "Release notes",
+        "Что нового",
+        "Versionshinweise",
+        "Notes de version",
+        "Notas de la versión",
+        "Notas da versão"
+    ],
+    UpdateInstall: [
+        "Install update",
+        "Установить обновление",
+        "Update installieren",
+        "Installer la mise à jour",
+        "Instalar actualización",
+        "Instalar atualização"
+    ],
+    UpdateReady: [
+        "The update is ready to install",
+        "Обновление готово к установке",
+        "Das Update ist bereit zur Installation",
+        "La mise à jour est prête à être installée",
+        "La actualización está lista para instalarse",
+        "A atualização está pronta para instalar"
+    ],
+    UpdateDownloading: [
+        "Downloading… {}%",
+        "Загрузка… {}%",
+        "Wird heruntergeladen… {}%",
+        "Téléchargement… {} %",
+        "Descargando… {} %",
+        "Baixando… {} %"
+    ],
+    UpdateInstalling: [
+        "Installing… the app will restart",
+        "Установка… приложение перезапустится",
+        "Wird installiert… die App startet neu",
+        "Installation… l'application va redémarrer",
+        "Instalando… la aplicación se reiniciará",
+        "Instalando… a aplicação vai reiniciar"
+    ],
+    UpdateConfirmTitle: [
+        "INSTALL UPDATE",
+        "УСТАНОВКА ОБНОВЛЕНИЯ",
+        "UPDATE INSTALLIEREN",
+        "INSTALLER LA MISE À JOUR",
+        "INSTALAR ACTUALIZACIÓN",
+        "INSTALAR ATUALIZAÇÃO"
+    ],
+    UpdateConfirmQuestion: [
+        "Install the update and restart?",
+        "Установить обновление и перезапустить?",
+        "Update installieren und neu starten?",
+        "Installer la mise à jour et redémarrer ?",
+        "¿Instalar la actualización y reiniciar?",
+        "Instalar a atualização e reiniciar?"
+    ],
+    UpdateConfirmText: [
+        "Clicking stops, the daemon shuts down and the app relaunches with the new version.",
+        "Клики остановятся, демон завершится, а приложение запустится заново с новой версией.",
+        "Die Klicks stoppen, der Daemon beendet sich und die App startet mit der neuen Version neu.",
+        "Les clics s'arrêtent, le démon quitte et l'application redémarre avec la nouvelle version.",
+        "Los clics se detienen, el daemon se cierra y la aplicación se reinicia con la nueva versión.",
+        "Os cliques param, o daemon encerra e a aplicação reinicia com a nova versão."
+    ],
+    UpdateConfirm: [
+        "INSTALL AND RESTART",
+        "УСТАНОВИТЬ И ПЕРЕЗАПУСТИТЬ",
+        "INSTALLIEREN UND NEU STARTEN",
+        "INSTALLER ET REDÉMARRER",
+        "INSTALAR Y REINICIAR",
+        "INSTALAR E REINICIAR"
+    ],
+    UpdateCheckOnStart: [
+        "Check at startup",
+        "Проверять при запуске",
+        "Beim Start prüfen",
+        "Vérifier au démarrage",
+        "Comprobar al iniciar",
+        "Verificar ao iniciar"
+    ],
+    UpdateCheckOnStartHint: [
+        "Look for a new release when the window opens",
+        "Искать новую версию при открытии окна",
+        "Beim Öffnen des Fensters nach einer neuen Version suchen",
+        "Rechercher une nouvelle version à l'ouverture de la fenêtre",
+        "Buscar una nueva versión al abrir la ventana",
+        "Procurar uma nova versão ao abrir a janela"
+    ],
+    UpdateDevBuild: [
+        "Updates are disabled in development builds.",
+        "В dev-сборках обновление недоступно.",
+        "In Entwicklungs-Builds sind Updates deaktiviert.",
+        "Les mises à jour sont désactivées dans les versions de développement.",
+        "Las actualizaciones están desactivadas en las compilaciones de desarrollo.",
+        "As atualizações estão desativadas em compilações de desenvolvimento."
+    ],
+    UpdatePlatformUnavailable: [
+        "Automatic updates are not available on this platform.",
+        "Автоматическое обновление недоступно на этой платформе.",
+        "Automatische Updates sind auf dieser Plattform nicht verfügbar.",
+        "Les mises à jour automatiques ne sont pas disponibles sur cette plateforme.",
+        "Las actualizaciones automáticas no están disponibles en esta plataforma.",
+        "As atualizações automáticas não estão disponíveis nesta plataforma."
+    ],
+    UpdateCheckFailed: [
+        "Could not check for updates: {}",
+        "Не удалось проверить обновления: {}",
+        "Updates konnten nicht geprüft werden: {}",
+        "Impossible de vérifier les mises à jour : {}",
+        "No se pudieron buscar actualizaciones: {}",
+        "Não foi possível verificar atualizações: {}"
+    ],
+    UpdateDownloadFailed: [
+        "Could not download the update: {}",
+        "Не удалось загрузить обновление: {}",
+        "Update konnte nicht heruntergeladen werden: {}",
+        "Impossible de télécharger la mise à jour : {}",
+        "No se pudo descargar la actualización: {}",
+        "Não foi possível baixar a atualização: {}"
+    ],
+    UpdateInstallFailed: [
+        "Could not install the update: {}",
+        "Не удалось установить обновление: {}",
+        "Update konnte nicht installiert werden: {}",
+        "Impossible d'installer la mise à jour : {}",
+        "No se pudo instalar la actualización: {}",
+        "Não foi possível instalar a atualização: {}"
+    ],
+    UpdateRestartFailed: [
+        "The update was installed, but the app could not restart: {}",
+        "Обновление установлено, но приложение не удалось перезапустить: {}",
+        "Das Update wurde installiert, aber die App konnte nicht neu gestartet werden: {}",
+        "La mise à jour est installée, mais l'application n'a pas pu redémarrer : {}",
+        "La actualización se instaló, pero no se pudo reiniciar la aplicación: {}",
+        "A atualização foi instalada, mas não foi possível reiniciar a aplicação: {}"
+    ],
     DaemonRunning: ["DAEMON RUNNING", "ДЕМОН РАБОТАЕТ", "DAEMON LÄUFT", "DÉMON ACTIF", "DAEMON ACTIVO", "DAEMON ATIVO"],
     DaemonStopped: ["DAEMON NOT RUNNING", "ДЕМОН НЕ ЗАПУЩЕН", "DAEMON NICHT AKTIV", "DÉMON INACTIF", "DAEMON INACTIVO", "DAEMON INATIVO"],
     QuitDaemon: ["STOP DAEMON", "ЗАВЕРШИТЬ ДЕМОН", "DAEMON BEENDEN", "ARRÊTER LE DÉMON", "DETENER DAEMON", "ENCERRAR DAEMON"],

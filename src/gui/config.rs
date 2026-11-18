@@ -169,6 +169,7 @@ pub struct Config {
     pub simple_mode: bool,
     pub always_on_top: bool,
     pub minimize_to_tray: bool,
+    pub check_updates: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -234,6 +235,8 @@ struct PersistedSettings {
     always_on_top: bool,
     #[serde(default)]
     minimize_to_tray: bool,
+    #[serde(default = "default_check_updates")]
+    check_updates: bool,
 }
 
 impl PersistedSettings {
@@ -264,6 +267,7 @@ impl PersistedSettings {
             simple_mode: config.simple_mode,
             always_on_top: config.always_on_top,
             minimize_to_tray: config.minimize_to_tray,
+            check_updates: config.check_updates,
         }
     }
 }
@@ -292,6 +296,10 @@ fn default_language() -> String {
     Language::Auto.as_str().to_string()
 }
 
+fn default_check_updates() -> bool {
+    true
+}
+
 pub fn load() -> Loaded {
     let fallback = || Config {
         settings: Settings::default(),
@@ -302,6 +310,7 @@ pub fn load() -> Loaded {
         simple_mode: false,
         always_on_top: false,
         minimize_to_tray: false,
+        check_updates: true,
     };
 
     let path = match config_path() {
@@ -411,6 +420,7 @@ pub fn load() -> Loaded {
         simple_mode: persisted.simple_mode,
         always_on_top: persisted.always_on_top,
         minimize_to_tray: persisted.minimize_to_tray,
+        check_updates: persisted.check_updates,
     };
 
     Loaded {
@@ -565,6 +575,7 @@ mod tests {
             simple_mode: true,
             always_on_top: true,
             minimize_to_tray: true,
+            check_updates: false,
         }
     }
 
@@ -586,6 +597,7 @@ mod tests {
         assert!(parsed.simple_mode);
         assert!(parsed.always_on_top);
         assert!(parsed.minimize_to_tray);
+        assert!(!parsed.check_updates);
         assert!(!text.contains("profiles"));
         assert!(!text.contains("active_profile"));
         assert!(!text.contains("ui_scale"));
@@ -615,6 +627,7 @@ mod tests {
         let persisted: PersistedSettings = toml::from_str(text).unwrap();
         assert!(!persisted.simple_mode);
         assert!(!persisted.always_on_top);
+        assert!(persisted.check_updates);
     }
 
     #[test]

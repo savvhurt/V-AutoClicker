@@ -256,6 +256,48 @@ pub fn spawn_daemon(extra_args: &[String]) -> Result<()> {
     Ok(())
 }
 
+/// Open a link in the user's default browser.
+pub fn open_url(url: &str) -> Result<()> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        use windows::core::HSTRING;
+
+        let operation = HSTRING::from("open");
+        let file = HSTRING::from(url);
+        let result = unsafe {
+            ShellExecuteW(
+                None,
+                &operation,
+                &file,
+                windows::core::PCWSTR::null(),
+                windows::core::PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        if result.0 as isize <= 32 {
+            anyhow::bail!(
+                "failed to open the link (ShellExecute returned {})",
+                result.0 as isize
+            );
+        }
+        Ok(())
+    }
+
+    #[cfg(not(windows))]
+    {
+        Command::new("xdg-open")
+            .arg(url)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .context("failed to open the link with xdg-open")?;
+        Ok(())
+    }
+}
+
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
