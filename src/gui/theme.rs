@@ -323,17 +323,90 @@ const WINE: Palette = Palette {
 const LIQUID_GLASS: Palette = Palette {
     dark: false,
     glass: true,
-    bg: Color32::from_rgb(233, 238, 250),
+    bg: Color32::from_rgb(214, 232, 255),
     panel: Color32::from_rgb(250, 252, 255),
     input: Color32::from_rgb(255, 255, 255),
+    // Lines are only a fallback: the glass theme derives its own dark
+    // hairlines and light rims in [`line`], [`line_soft`] and [`card`].
     line: Color32::from_rgb(255, 255, 255),
     line_soft: Color32::from_rgb(255, 255, 255),
-    text: Color32::from_rgb(26, 30, 45),
-    muted: Color32::from_rgb(92, 100, 122),
-    dim: Color32::from_rgb(138, 146, 168),
-    warning: Color32::from_rgb(168, 105, 18),
-    danger: Color32::from_rgb(186, 55, 64),
-    accent: Color32::from_rgb(84, 122, 220),
+    text: Color32::from_rgb(29, 29, 31),
+    muted: Color32::from_rgb(72, 72, 74),
+    dim: Color32::from_rgb(110, 110, 115),
+    warning: Color32::from_rgb(178, 80, 0),
+    danger: Color32::from_rgb(215, 0, 21),
+    accent: Color32::from_rgb(10, 132, 255),
+};
+
+/// Corner radii shared by the card frame, its specular edge and the dialog
+/// pane so the painted rim can never drift away from the rounded fill.
+const GLASS_CARD_RADIUS: u8 = 22;
+const GLASS_DIALOG_RADIUS: u8 = 24;
+
+// Seasonal and neon palettes. Halloween, Neon and Terminal Green are dark;
+// Winter stays light so it feels like frost on a window.
+const HALLOWEEN: Palette = Palette {
+    dark: true,
+    glass: false,
+    bg: Color32::from_rgb(20, 15, 26),
+    panel: Color32::from_rgb(30, 22, 38),
+    input: Color32::from_rgb(43, 32, 53),
+    line: Color32::from_rgb(74, 54, 88),
+    line_soft: Color32::from_rgb(55, 40, 66),
+    text: Color32::from_rgb(244, 234, 216),
+    muted: Color32::from_rgb(185, 166, 199),
+    dim: Color32::from_rgb(133, 115, 148),
+    warning: Color32::from_rgb(245, 163, 60),
+    danger: Color32::from_rgb(255, 93, 93),
+    accent: Color32::from_rgb(255, 122, 26),
+};
+
+const WINTER: Palette = Palette {
+    dark: false,
+    glass: false,
+    bg: Color32::from_rgb(234, 242, 251),
+    panel: Color32::from_rgb(247, 251, 255),
+    input: Color32::from_rgb(221, 234, 247),
+    line: Color32::from_rgb(191, 213, 232),
+    line_soft: Color32::from_rgb(214, 229, 242),
+    text: Color32::from_rgb(23, 40, 58),
+    muted: Color32::from_rgb(108, 129, 153),
+    dim: Color32::from_rgb(157, 177, 198),
+    warning: Color32::from_rgb(181, 124, 19),
+    danger: Color32::from_rgb(200, 67, 62),
+    accent: Color32::from_rgb(201, 154, 62),
+};
+
+const NEON: Palette = Palette {
+    dark: true,
+    glass: false,
+    bg: Color32::from_rgb(7, 7, 15),
+    panel: Color32::from_rgb(15, 15, 28),
+    input: Color32::from_rgb(24, 24, 41),
+    line: Color32::from_rgb(46, 46, 77),
+    line_soft: Color32::from_rgb(32, 32, 57),
+    text: Color32::from_rgb(245, 243, 255),
+    muted: Color32::from_rgb(169, 162, 221),
+    dim: Color32::from_rgb(111, 104, 160),
+    warning: Color32::from_rgb(255, 209, 102),
+    danger: Color32::from_rgb(255, 77, 141),
+    accent: Color32::from_rgb(34, 230, 255),
+};
+
+const TERMINAL_GREEN: Palette = Palette {
+    dark: true,
+    glass: false,
+    bg: Color32::from_rgb(5, 10, 6),
+    panel: Color32::from_rgb(10, 20, 12),
+    input: Color32::from_rgb(15, 30, 17),
+    line: Color32::from_rgb(33, 69, 42),
+    line_soft: Color32::from_rgb(23, 49, 30),
+    text: Color32::from_rgb(201, 255, 210),
+    muted: Color32::from_rgb(127, 201, 139),
+    dim: Color32::from_rgb(78, 138, 90),
+    warning: Color32::from_rgb(216, 255, 112),
+    danger: Color32::from_rgb(255, 107, 107),
+    accent: Color32::from_rgb(57, 255, 106),
 };
 
 const SANS_REGULAR: &str = "plex-sans-regular";
@@ -391,6 +464,10 @@ fn palette() -> Palette {
         Theme::Plum => PLUM,
         Theme::Wine => WINE,
         Theme::LiquidGlass => LIQUID_GLASS,
+        Theme::Halloween => HALLOWEEN,
+        Theme::Winter => WINTER,
+        Theme::Neon => NEON,
+        Theme::TerminalGreen => TERMINAL_GREEN,
     }
 }
 
@@ -403,15 +480,53 @@ pub fn panel() -> Color32 {
 }
 
 pub fn input() -> Color32 {
-    palette().input
+    if palette().glass {
+        alpha(Color32::WHITE, 118)
+    } else {
+        palette().input
+    }
+}
+
+/// Slightly denser fill for editable fields and popup surfaces, where text
+/// needs a calmer base than the surrounding card glass.
+pub fn field() -> Color32 {
+    if palette().glass {
+        alpha(Color32::WHITE, 148)
+    } else {
+        palette().input
+    }
 }
 
 pub fn line() -> Color32 {
-    palette().line
+    if palette().glass {
+        // A dark hairline reads on the pale glass; white-on-white vanished.
+        alpha(Color32::BLACK, 30)
+    } else {
+        palette().line
+    }
 }
 
 pub fn line_soft() -> Color32 {
-    palette().line_soft
+    if palette().glass {
+        alpha(Color32::BLACK, 20)
+    } else {
+        palette().line_soft
+    }
+}
+
+pub fn glass() -> bool {
+    palette().glass
+}
+
+fn current_theme() -> Theme {
+    Theme::from_index(CURRENT.load(Ordering::Relaxed))
+}
+
+fn decorated() -> bool {
+    matches!(
+        current_theme(),
+        Theme::LiquidGlass | Theme::Halloween | Theme::Winter | Theme::Neon | Theme::TerminalGreen
+    )
 }
 
 pub fn text() -> Color32 {
@@ -428,6 +543,16 @@ pub fn dim() -> Color32 {
 
 pub fn accent() -> Color32 {
     palette().accent
+}
+
+/// Darker accent variant for small blue text on pale glass. The bright system
+/// blue stays reserved for fills, glyphs and focus rings.
+pub fn accent_ink() -> Color32 {
+    if palette().glass {
+        Color32::from_rgb(0, 102, 204)
+    } else {
+        palette().accent
+    }
 }
 
 /// Readable foreground for content drawn on top of [`accent`].
@@ -452,33 +577,35 @@ pub fn danger() -> Color32 {
 /// Fill for the root central panel. In the glass theme it stays transparent
 /// so [`paint_backdrop`] shows through; other themes keep the flat background.
 pub fn backdrop_fill() -> Color32 {
-    if palette().glass {
+    if decorated() {
         Color32::TRANSPARENT
     } else {
         palette().bg
     }
 }
 
-/// Fill for full-width strips (the daemon footer) that sit on the backdrop.
-#[cfg(not(windows))]
-pub fn bar_fill() -> Color32 {
-    if palette().glass {
-        alpha(Color32::WHITE, 132)
+pub fn sans(size: f32) -> FontId {
+    if current_theme() == Theme::TerminalGreen {
+        FontId::new(size, FontFamily::Monospace)
     } else {
-        palette().bg
+        FontId::new(size, FontFamily::Proportional)
     }
 }
 
-pub fn sans(size: f32) -> FontId {
-    FontId::new(size, FontFamily::Proportional)
-}
-
 pub fn sans_medium(size: f32) -> FontId {
-    FontId::new(size, named_family(FAMILY_SANS_MEDIUM))
+    if current_theme() == Theme::TerminalGreen {
+        FontId::new(size, named_family(FAMILY_MONO_MEDIUM))
+    } else {
+        FontId::new(size, named_family(FAMILY_SANS_MEDIUM))
+    }
 }
 
 pub fn sans_semibold(size: f32) -> FontId {
-    FontId::new(size, named_family(FAMILY_SANS_SEMIBOLD))
+    if current_theme() == Theme::TerminalGreen {
+        FontId::new(size, named_family(FAMILY_MONO_MEDIUM))
+    } else {
+        FontId::new(size, named_family(FAMILY_SANS_SEMIBOLD))
+    }
 }
 
 pub fn mono(size: f32) -> FontId {
@@ -513,17 +640,15 @@ pub fn rule(ui: &mut egui::Ui) {
 /// A soft rounded surface used to group related controls.
 pub fn card() -> egui::Frame {
     if palette().glass {
+        // No outer drop shadow: the footer lives in a bottom panel whose clip
+        // rect would cut a rectangular slice out of a wide shadow. The pane
+        // instead gets its depth from the rim and the inner bottom shade that
+        // [`paint_glass_edge`] draws just inside the rounded rect.
         return egui::Frame::new()
-            .fill(alpha(Color32::WHITE, 150))
-            .stroke(Stroke::new(1.0_f32, alpha(Color32::WHITE, 210)))
-            .corner_radius(CornerRadius::same(16))
-            .inner_margin(Margin::symmetric(12, 8))
-            .shadow(Shadow {
-                offset: [0, 8],
-                blur: 24,
-                spread: 0,
-                color: Color32::from_black_alpha(24),
-            });
+            .fill(alpha(Color32::WHITE, 118))
+            .stroke(Stroke::new(1.0_f32, alpha(Color32::WHITE, 195)))
+            .corner_radius(CornerRadius::same(GLASS_CARD_RADIUS))
+            .inner_margin(Margin::symmetric(14, 8));
     }
 
     egui::Frame::new()
@@ -533,39 +658,370 @@ pub fn card() -> egui::Frame {
         .inner_margin(Margin::symmetric(12, 8))
 }
 
-/// Paints the simulated liquid-glass backdrop: a soft four-corner gradient
-/// with a few blurred-looking color blobs. Other themes keep their flat fill,
-/// so this is a no-op unless the active palette sets `glass`.
-pub fn paint_backdrop(ui: &egui::Ui) {
-    if !palette().glass {
-        return;
+/// Draw a card and add the thin specular edge that makes the glass read as a
+/// physical pane. Other themes fall back to [`card`] unchanged.
+pub fn card_show<R>(
+    ui: &mut egui::Ui,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    let response = card().show(ui, add);
+    if palette().glass {
+        paint_glass_edge(ui.painter(), response.response.rect, GLASS_CARD_RADIUS);
+    }
+    response
+}
+
+/// Paints the light rim, top specular line and inner bottom shade of a glass
+/// pane. Shared by cards and dialogs so both use the same material.
+pub fn paint_glass_edge(painter: &egui::Painter, rect: egui::Rect, radius: u8) {
+    let radius = CornerRadius::same(radius);
+    let painter = painter.with_clip_rect(rect);
+    painter.rect_stroke(
+        rect.shrink(0.6),
+        radius,
+        Stroke::new(1.0_f32, alpha(Color32::WHITE, 205)),
+        egui::StrokeKind::Inside,
+    );
+
+    let inset = radius.nw as f32;
+    painter.line_segment(
+        [
+            egui::pos2(rect.left() + inset, rect.top() + 1.4),
+            egui::pos2(rect.right() - inset, rect.top() + 1.4),
+        ],
+        Stroke::new(1.0_f32, alpha(Color32::WHITE, 240)),
+    );
+    painter.line_segment(
+        [
+            egui::pos2(rect.left() + inset, rect.bottom() - 1.3),
+            egui::pos2(rect.right() - inset, rect.bottom() - 1.3),
+        ],
+        Stroke::new(1.0_f32, alpha(Color32::BLACK, 24)),
+    );
+}
+
+/// Frame for modal dialogs. Glass gets a denser frosted pane than a card so
+/// it stays readable over the dimmed backdrop.
+pub fn dialog() -> egui::Frame {
+    if palette().glass {
+        return egui::Frame::new()
+            .fill(alpha(Color32::WHITE, 226))
+            .stroke(Stroke::new(1.0_f32, alpha(Color32::WHITE, 240)))
+            .corner_radius(CornerRadius::same(GLASS_DIALOG_RADIUS))
+            .inner_margin(Margin::same(24))
+            .shadow(Shadow {
+                offset: [0, 18],
+                blur: 48,
+                spread: 0,
+                color: Color32::from_black_alpha(52),
+            });
     }
 
+    egui::Frame::new()
+        .fill(panel())
+        .stroke(Stroke::new(1.0_f32, line()))
+        .corner_radius(CornerRadius::same(16))
+        .inner_margin(Margin::same(24))
+        .shadow(shadow())
+}
+
+/// Adds the dialog rim after a modal has been shown, on the modal's own layer.
+pub fn paint_dialog_edge(ctx: &egui::Context, layer: egui::LayerId, rect: egui::Rect) {
+    if palette().glass {
+        paint_glass_edge(&ctx.layer_painter(layer), rect, GLASS_DIALOG_RADIUS);
+    }
+}
+
+/// Paints the simulated glass and seasonal wallpapers. Themes without a
+/// wallpaper keep their flat fill, so this is a no-op for them.
+pub fn paint_backdrop(ui: &egui::Ui) {
     let rect = ui.max_rect();
     let painter = ui.painter();
 
-    let mut mesh = egui::Mesh::default();
-    mesh.colored_vertex(rect.left_top(), Color32::from_rgb(226, 236, 252));
-    mesh.colored_vertex(rect.right_top(), Color32::from_rgb(238, 231, 250));
-    mesh.colored_vertex(rect.right_bottom(), Color32::from_rgb(246, 233, 238));
-    mesh.colored_vertex(rect.left_bottom(), Color32::from_rgb(229, 242, 246));
-    mesh.add_triangle(0, 1, 2);
-    mesh.add_triangle(0, 2, 3);
-    painter.add(egui::Shape::mesh(mesh));
+    match current_theme() {
+        Theme::LiquidGlass => glass_backdrop(painter, rect),
+        Theme::Halloween => halloween_backdrop(painter, rect),
+        Theme::Winter => winter_backdrop(painter, rect),
+        Theme::Neon => neon_backdrop(painter, rect),
+        Theme::TerminalGreen => terminal_backdrop(painter, rect),
+        _ => {}
+    }
+}
+
+fn glass_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    // A saturated wallpaper rather than a pale wash: the translucent panes
+    // need real colour behind them for the frosted effect to read at all.
+    quad_gradient(
+        painter,
+        rect,
+        Color32::from_rgb(166, 208, 255),
+        Color32::from_rgb(216, 196, 255),
+        Color32::from_rgb(255, 199, 224),
+        Color32::from_rgb(166, 240, 224),
+    );
 
     let extent = rect.width().max(rect.height());
     let blobs = [
-        (0.12, 0.08, 0.52, Color32::from_rgb(120, 170, 255)),
-        (0.94, 0.24, 0.44, Color32::from_rgb(196, 150, 255)),
-        (0.18, 0.94, 0.50, Color32::from_rgb(255, 176, 198)),
-        (0.86, 0.90, 0.42, Color32::from_rgb(150, 225, 215)),
+        (0.04, 0.02, 0.66, Color32::from_rgb(64, 142, 255)),
+        (0.96, 0.12, 0.56, Color32::from_rgb(160, 110, 255)),
+        (0.88, 0.96, 0.54, Color32::from_rgb(255, 92, 158)),
+        (0.02, 0.94, 0.62, Color32::from_rgb(42, 214, 190)),
+        (0.50, 0.42, 0.44, Color32::from_rgb(255, 190, 120)),
+        (0.64, -0.04, 0.38, Color32::from_rgb(92, 190, 255)),
     ];
     for (x, y, radius, color) in blobs {
         let center = egui::pos2(
             rect.left() + rect.width() * x,
             rect.top() + rect.height() * y,
         );
-        blob(painter, center, extent * radius, alpha(color, 48));
+        blob(painter, center, extent * radius, alpha(color, 54));
+    }
+
+    // A soft top light, like a window reflecting into the glass.
+    vertical_gradient(
+        painter,
+        egui::Rect::from_min_max(
+            rect.min,
+            egui::pos2(rect.right(), rect.top() + rect.height() * 0.46),
+        ),
+        alpha(Color32::WHITE, 42),
+        Color32::TRANSPARENT,
+    );
+
+    // A faint diagonal sheen adds depth without introducing a visible edge.
+    let sheen = egui::Rect::from_min_max(
+        egui::pos2(rect.left() - rect.width() * 0.2, rect.top()),
+        egui::pos2(
+            rect.left() + rect.width() * 0.55,
+            rect.top() + rect.height() * 0.7,
+        ),
+    );
+    blob(
+        painter,
+        sheen.center(),
+        extent * 0.5,
+        alpha(Color32::WHITE, 18),
+    );
+}
+
+fn halloween_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    vertical_gradient(
+        painter,
+        rect,
+        Color32::from_rgb(26, 17, 34),
+        Color32::from_rgb(10, 7, 15),
+    );
+
+    let extent = rect.width().max(rect.height());
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.14,
+            rect.top() + rect.height() * 0.92,
+        ),
+        extent * 0.60,
+        alpha(Color32::from_rgb(255, 112, 24), 44),
+    );
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.92,
+            rect.top() + rect.height() * 0.10,
+        ),
+        extent * 0.52,
+        alpha(Color32::from_rgb(121, 74, 190), 52),
+    );
+
+    let bats = [
+        (0.13, 0.12, 12.0),
+        (0.31, 0.07, 8.0),
+        (0.83, 0.24, 10.0),
+        (0.93, 0.58, 7.0),
+        (0.20, 0.71, 9.0),
+    ];
+    for (x, y, size) in bats {
+        bat(
+            painter,
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            size,
+            alpha(Color32::from_rgb(255, 190, 120), 42),
+        );
+    }
+}
+
+fn winter_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    vertical_gradient(
+        painter,
+        rect,
+        Color32::from_rgb(226, 240, 253),
+        Color32::from_rgb(248, 252, 255),
+    );
+
+    let extent = rect.width().max(rect.height());
+    for (x, y, radius, color) in [
+        (0.12, 0.16, 0.52, Color32::from_rgb(126, 186, 255)),
+        (0.86, 0.80, 0.48, Color32::from_rgb(168, 224, 255)),
+        (0.92, 0.12, 0.34, Color32::from_rgb(255, 221, 150)),
+    ] {
+        blob(
+            painter,
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            extent * radius,
+            alpha(color, 34),
+        );
+    }
+
+    for index in 0..72 {
+        let x = ((index * 37 + 11) % 101) as f32 / 100.0;
+        let y = ((index * 53 + 7) % 97) as f32 / 96.0;
+        let radius = 0.7 + ((index * 7) % 5) as f32 * 0.34;
+        painter.circle_filled(
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            radius,
+            alpha(Color32::WHITE, 150),
+        );
+    }
+
+    for (x, y, size) in [(0.80, 0.10, 9.0), (0.16, 0.84, 7.0), (0.58, 0.30, 5.0)] {
+        snowflake(
+            painter,
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            size,
+            alpha(Color32::from_rgb(120, 178, 226), 66),
+        );
+    }
+}
+
+fn neon_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    painter.rect_filled(rect, 0, Color32::from_rgb(7, 7, 15));
+
+    let extent = rect.width().max(rect.height());
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.08,
+            rect.top() + rect.height() * 0.88,
+        ),
+        extent * 0.64,
+        alpha(Color32::from_rgb(0, 220, 255), 42),
+    );
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.92,
+            rect.top() + rect.height() * 0.12,
+        ),
+        extent * 0.56,
+        alpha(Color32::from_rgb(255, 44, 190), 38),
+    );
+
+    let step = 46.0;
+    let mut x = rect.left();
+    while x < rect.right() {
+        painter.line_segment(
+            [egui::pos2(x, rect.top()), egui::pos2(x, rect.bottom())],
+            Stroke::new(1.0_f32, alpha(Color32::from_rgb(0, 220, 255), 11)),
+        );
+        x += step;
+    }
+    let mut y = rect.top();
+    while y < rect.bottom() {
+        painter.line_segment(
+            [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
+            Stroke::new(1.0_f32, alpha(Color32::from_rgb(255, 44, 190), 9)),
+        );
+        y += step;
+    }
+}
+
+fn terminal_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    painter.rect_filled(rect, 0, Color32::from_rgb(4, 9, 5));
+
+    let extent = rect.width().max(rect.height());
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.10,
+            rect.top() + rect.height() * 0.90,
+        ),
+        extent * 0.62,
+        alpha(Color32::from_rgb(48, 255, 96), 26),
+    );
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.90,
+            rect.top() + rect.height() * 0.08,
+        ),
+        extent * 0.42,
+        alpha(Color32::from_rgb(0, 150, 70), 22),
+    );
+
+    let mut y = rect.top();
+    while y < rect.bottom() {
+        painter.line_segment(
+            [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
+            Stroke::new(1.0_f32, alpha(Color32::from_rgb(120, 255, 150), 9)),
+        );
+        y += 3.0;
+    }
+}
+
+fn quad_gradient(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    top_left: Color32,
+    top_right: Color32,
+    bottom_right: Color32,
+    bottom_left: Color32,
+) {
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(rect.left_top(), top_left);
+    mesh.colored_vertex(rect.right_top(), top_right);
+    mesh.colored_vertex(rect.right_bottom(), bottom_right);
+    mesh.colored_vertex(rect.left_bottom(), bottom_left);
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    painter.add(egui::Shape::mesh(mesh));
+}
+
+fn vertical_gradient(painter: &egui::Painter, rect: egui::Rect, top: Color32, bottom: Color32) {
+    quad_gradient(painter, rect, top, top, bottom, bottom);
+}
+
+fn bat(painter: &egui::Painter, center: egui::Pos2, size: f32, color: Color32) {
+    for direction in [-1.0_f32, 1.0] {
+        painter.add(egui::Shape::convex_polygon(
+            vec![
+                center,
+                center + egui::vec2(direction * size, -size * 0.52),
+                center + egui::vec2(direction * size * 0.94, size * 0.10),
+            ],
+            color,
+            Stroke::NONE,
+        ));
+    }
+    painter.circle_filled(center, size * 0.19, color);
+}
+
+fn snowflake(painter: &egui::Painter, center: egui::Pos2, size: f32, color: Color32) {
+    let stroke = Stroke::new(1.0_f32, color);
+    for index in 0..3 {
+        let angle = index as f32 / 3.0 * std::f32::consts::PI;
+        let direction = egui::vec2(angle.cos(), angle.sin()) * size;
+        painter.line_segment([center - direction, center + direction], stroke);
     }
 }
 
@@ -710,12 +1166,28 @@ fn visuals(palette: Palette) -> egui::Visuals {
     };
     visuals.dark_mode = dark;
     visuals.panel_fill = bg;
-    visuals.window_fill = panel;
+    visuals.window_fill = if palette.glass {
+        alpha(Color32::WHITE, 232)
+    } else {
+        panel
+    };
     visuals.faint_bg_color = input;
-    visuals.extreme_bg_color = panel;
+    visuals.extreme_bg_color = if palette.glass {
+        Color32::TRANSPARENT
+    } else {
+        panel
+    };
     visuals.code_bg_color = input;
-    visuals.window_stroke = Stroke::new(1.0_f32, line);
-    visuals.window_corner_radius = CornerRadius::same(16);
+    visuals.window_stroke = Stroke::new(
+        1.0_f32,
+        if palette.glass {
+            alpha(Color32::WHITE, 235)
+        } else {
+            line
+        },
+    );
+    visuals.window_corner_radius =
+        CornerRadius::same(if palette.glass { GLASS_CARD_RADIUS } else { 16 });
     visuals.window_shadow = shadow_for(dark);
     visuals.popup_shadow = shadow_for(dark);
     visuals.menu_corner_radius = CornerRadius::same(10);
@@ -727,21 +1199,30 @@ fn visuals(palette: Palette) -> egui::Visuals {
     visuals.slider_trailing_fill = true;
     visuals.text_cursor.stroke = Stroke::new(1.5_f32, accent);
 
+    let widget_radius = if palette.glass { 10 } else { 7 };
     let idle_fill = if palette.glass {
-        alpha(Color32::WHITE, 168)
+        alpha(Color32::WHITE, 155)
     } else {
         input
     };
     let idle_stroke = if palette.glass {
-        Stroke::new(1.0_f32, alpha(Color32::WHITE, 225))
+        Stroke::new(1.0_f32, alpha(Color32::BLACK, 24))
     } else {
         Stroke::new(1.0_f32, line)
     };
 
     let mut widgets = visuals.widgets.clone();
     widgets.noninteractive = egui::style::WidgetVisuals {
-        bg_fill: bg,
-        weak_bg_fill: bg,
+        bg_fill: if palette.glass {
+            alpha(Color32::WHITE, 72)
+        } else {
+            bg
+        },
+        weak_bg_fill: if palette.glass {
+            alpha(Color32::WHITE, 72)
+        } else {
+            bg
+        },
         bg_stroke: Stroke::NONE,
         corner_radius: CornerRadius::same(8),
         fg_stroke: Stroke::new(1.0_f32, text),
@@ -751,7 +1232,7 @@ fn visuals(palette: Palette) -> egui::Visuals {
         bg_fill: idle_fill,
         weak_bg_fill: idle_fill,
         bg_stroke: idle_stroke,
-        corner_radius: CornerRadius::same(7),
+        corner_radius: CornerRadius::same(widget_radius),
         fg_stroke: Stroke::new(1.0_f32, text),
         expansion: 0.0,
     };
@@ -767,7 +1248,7 @@ fn visuals(palette: Palette) -> egui::Visuals {
             mix(input, accent, if dark { 0.14 } else { 0.08 })
         },
         bg_stroke: Stroke::new(1.0_f32, alpha(accent, 170)),
-        corner_radius: CornerRadius::same(7),
+        corner_radius: CornerRadius::same(widget_radius),
         fg_stroke: Stroke::new(1.0_f32, text),
         expansion: 0.0,
     };
@@ -793,7 +1274,7 @@ fn visuals(palette: Palette) -> egui::Visuals {
             },
         ),
         bg_stroke: Stroke::new(1.0_f32, accent),
-        corner_radius: CornerRadius::same(7),
+        corner_radius: CornerRadius::same(widget_radius),
         fg_stroke: Stroke::new(1.0_f32, text),
         expansion: 0.0,
     };
@@ -809,7 +1290,7 @@ fn visuals(palette: Palette) -> egui::Visuals {
             mix(input, accent, if dark { 0.18 } else { 0.10 })
         },
         bg_stroke: Stroke::new(1.0_f32, accent),
-        corner_radius: CornerRadius::same(7),
+        corner_radius: CornerRadius::same(widget_radius),
         fg_stroke: Stroke::new(1.0_f32, text),
         expansion: 0.0,
     };

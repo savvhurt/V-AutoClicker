@@ -113,7 +113,7 @@ pub fn power_button(ui: &mut Ui, active: bool, busy: bool, size: f32) -> Respons
     );
     painter.circle_stroke(center, radius, Stroke::new(1.2 + hover_t * 0.4, ring));
 
-    let glyph = theme::mix(theme::text(), theme::bg(), active_t);
+    let glyph = theme::mix(theme::text(), theme::on_accent(), active_t);
     paint_power_glyph(
         painter,
         center,
@@ -212,13 +212,35 @@ fn segmented_impl<T: Copy + PartialEq>(
     }
 
     let before = *selected;
-    let radius = CornerRadius::same(if emphasize { 9 } else { 7 });
+    let glass = theme::glass();
+    let radius = CornerRadius::same(if glass {
+        if emphasize { 12 } else { 10 }
+    } else if emphasize {
+        9
+    } else {
+        7
+    });
     let painter = ui.painter();
-    painter.rect_filled(rect, radius, theme::input());
+    painter.rect_filled(
+        rect,
+        radius,
+        if glass {
+            theme::alpha(Color32::WHITE, 86)
+        } else {
+            theme::input()
+        },
+    );
     painter.rect_stroke(
         rect,
         radius,
-        Stroke::new(1.0_f32, theme::line()),
+        Stroke::new(
+            1.0_f32,
+            if glass {
+                theme::alpha(Color32::WHITE, 170)
+            } else {
+                theme::line()
+            },
+        ),
         egui::StrokeKind::Inside,
     );
 
@@ -229,28 +251,50 @@ fn segmented_impl<T: Copy + PartialEq>(
         );
         let is_selected = *value == before;
         let is_hovered = hovered == Some(index);
+        let segment_radius = CornerRadius::same(if glass {
+            if emphasize { 10 } else { 8 }
+        } else if emphasize {
+            7
+        } else {
+            5
+        });
 
-        if is_selected || is_hovered {
-            painter.rect_filled(
-                segment.shrink2(vec2(1.0, 0.0)),
-                CornerRadius::same(if emphasize { 7 } else { 5 }),
-                theme::alpha(
-                    theme::accent(),
-                    if is_selected {
-                        if emphasize { 40 } else { 30 }
-                    } else {
-                        12
-                    },
-                ),
-            );
-        }
-        if is_selected {
-            painter.rect_stroke(
-                segment.shrink2(vec2(1.0, 0.0)),
-                CornerRadius::same(if emphasize { 7 } else { 5 }),
-                Stroke::new(1.0_f32, theme::accent()),
-                egui::StrokeKind::Inside,
-            );
+        if glass {
+            if is_selected {
+                // iOS-style floating white capsule: a soft shadow and no
+                // accent outline.
+                painter.rect_filled(
+                    segment.translate(vec2(0.0, 1.0)),
+                    segment_radius,
+                    theme::alpha(Color32::BLACK, 26),
+                );
+                painter.rect_filled(segment, segment_radius, theme::alpha(Color32::WHITE, 235));
+            } else if is_hovered {
+                painter.rect_filled(segment, segment_radius, theme::alpha(Color32::WHITE, 80));
+            }
+        } else {
+            if is_selected || is_hovered {
+                painter.rect_filled(
+                    segment.shrink2(vec2(1.0, 0.0)),
+                    segment_radius,
+                    theme::alpha(
+                        theme::accent(),
+                        if is_selected {
+                            if emphasize { 40 } else { 30 }
+                        } else {
+                            12
+                        },
+                    ),
+                );
+            }
+            if is_selected {
+                painter.rect_stroke(
+                    segment.shrink2(vec2(1.0, 0.0)),
+                    segment_radius,
+                    Stroke::new(1.0_f32, theme::accent()),
+                    egui::StrokeKind::Inside,
+                );
+            }
         }
 
         let color = if is_selected || is_hovered {
@@ -331,19 +375,30 @@ pub fn parameter_slider(
 
     let handle = pos2(handle_x, center_y);
     let radius = if hot { 6.5 } else { 5.5 };
-    painter.circle_filled(
-        handle,
-        radius,
-        if hot { theme::accent() } else { theme::bg() },
-    );
-    painter.circle_stroke(handle, radius, Stroke::new(2.0_f32, theme::accent()));
+    if theme::glass() {
+        // Frosted white thumb with a blue ring and a soft contact shadow.
+        painter.circle_filled(
+            handle + vec2(0.0, 1.0),
+            radius + 0.5,
+            theme::alpha(Color32::BLACK, 28),
+        );
+        painter.circle_filled(handle, radius, Color32::WHITE);
+        painter.circle_stroke(handle, radius, Stroke::new(2.0_f32, theme::accent()));
+    } else {
+        painter.circle_filled(
+            handle,
+            radius,
+            if hot { theme::accent() } else { theme::bg() },
+        );
+        painter.circle_stroke(handle, radius, Stroke::new(2.0_f32, theme::accent()));
+    }
 
     response
 }
 
 fn paint_field_fill(ui: &Ui, rect: Rect) {
     ui.painter()
-        .rect_filled(rect, CornerRadius::same(6), theme::input());
+        .rect_filled(rect, CornerRadius::same(7), theme::field());
 }
 
 fn paint_field_border(ui: &Ui, rect: Rect, hovered: bool, focused: bool) {
@@ -356,7 +411,7 @@ fn paint_field_border(ui: &Ui, rect: Rect, hovered: bool, focused: bool) {
     };
     ui.painter().rect_stroke(
         rect,
-        CornerRadius::same(6),
+        CornerRadius::same(7),
         Stroke::new(width, color),
         egui::StrokeKind::Inside,
     );
@@ -380,7 +435,11 @@ fn configure_field_child(ui: &mut Ui, rect: Rect) -> Ui {
     child.spacing_mut().interact_size =
         Vec2::new(FIELD_WIDTH - 2.0 * FIELD_PADDING, FIELD_HEIGHT - 2.0);
     child.spacing_mut().button_padding = Vec2::new(FIELD_PADDING, 1.0);
-    child.visuals_mut().extreme_bg_color = theme::panel();
+    child.visuals_mut().extreme_bg_color = if theme::glass() {
+        Color32::TRANSPARENT
+    } else {
+        theme::panel()
+    };
     child.visuals_mut().widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
     child.visuals_mut().widgets.inactive.bg_stroke = Stroke::NONE;
     child.visuals_mut().widgets.hovered.weak_bg_fill = Color32::TRANSPARENT;
@@ -502,18 +561,23 @@ pub fn checkbox(ui: &mut Ui, checked: &mut bool, label: &str) -> Response {
         theme::accent()
     } else if hovered {
         theme::alpha(theme::accent(), 18)
+    } else if theme::glass() {
+        theme::alpha(Color32::WHITE, 210)
     } else {
         theme::input()
     };
     let stroke = if *checked || hovered {
         theme::accent()
+    } else if theme::glass() {
+        theme::line()
     } else {
         theme::muted()
     };
-    painter.rect_filled(box_rect, CornerRadius::same(4), fill);
+    let box_radius = CornerRadius::same(if theme::glass() { 5 } else { 4 });
+    painter.rect_filled(box_rect, box_radius, fill);
     painter.rect_stroke(
         box_rect,
-        CornerRadius::same(4),
+        box_radius,
         Stroke::new(1.5_f32, stroke),
         egui::StrokeKind::Inside,
     );
@@ -659,9 +723,22 @@ pub fn text_button(ui: &mut Ui, label: &str, idle: Color32, hover: Color32) -> R
         idle
     };
     let painter = ui.painter();
-    let radius = CornerRadius::same(6);
+    let glass = theme::glass();
+    let radius = CornerRadius::same(if glass { 11 } else { 6 });
     if enabled {
-        let (fill, stroke) = if response.hovered() {
+        let (fill, stroke) = if glass {
+            if response.hovered() {
+                (
+                    theme::alpha(hover, 34),
+                    Stroke::new(1.0_f32, theme::alpha(hover, 170)),
+                )
+            } else {
+                (
+                    theme::alpha(Color32::WHITE, 165),
+                    Stroke::new(1.0_f32, theme::alpha(Color32::BLACK, 22)),
+                )
+            }
+        } else if response.hovered() {
             (
                 theme::alpha(hover, 16),
                 Stroke::new(1.0_f32, theme::alpha(hover, 190)),

@@ -4,9 +4,7 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use egui::{
-    self, Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, Sense, Stroke, Ui, Vec2,
-};
+use egui::{self, Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, Sense, Ui, Vec2};
 use egui_software_backend::{SoftwareBackend, SoftwareBackendAppConfiguration};
 
 use super::config::{self, Theme};
@@ -788,25 +786,12 @@ impl GuiApp {
         ui.add_space(2.0);
 
         let version = format!("v{}", update::CURRENT_VERSION);
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 0.0;
-            let _ = row_label(ui, self.t(Key::RowUpdates), self.t(Key::HintUpdates), 20.0);
-            ui.add_space(6.0);
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.label(
-                    RichText::new(&version)
-                        .font(theme::mono(9.5))
-                        .color(theme::muted()),
-                );
-            });
-        });
-        ui.add_space(2.0);
-
         let mut check_clicked = false;
         let mut install_clicked = false;
         let mut download_clicked = false;
         let mut open_notes: Option<String> = None;
         let mut status: Option<(String, Color32)> = None;
+        let mut failure: Option<String> = None;
         let mut show_check = false;
         let mut show_install = false;
         let mut notes_url: Option<String> = None;
@@ -830,13 +815,13 @@ impl GuiApp {
                 UpdateState::Available(release) => {
                     status = Some((
                         self.fill(Key::UpdateAvailable, &[release.version.to_string()]),
-                        theme::accent(),
+                        theme::accent_ink(),
                     ));
                     show_install = true;
                     notes_url = Some(release.page_url.clone());
                 }
                 UpdateState::Ready { release, .. } => {
-                    status = Some((self.t(Key::UpdateReady).to_string(), theme::accent()));
+                    status = Some((self.t(Key::UpdateReady).to_string(), theme::accent_ink()));
                     show_install = true;
                     notes_url = Some(release.page_url.clone());
                 }
@@ -851,43 +836,97 @@ impl GuiApp {
                     status = Some((self.t(Key::UpdateInstalling).to_string(), theme::warning()));
                 }
                 UpdateState::Failed(message) => {
-                    status = Some((message.clone(), theme::warning()));
+                    failure = Some(message.clone());
                     show_check = true;
                 }
             }
         }
 
-        if let Some((text, color)) = &status {
-            ui.horizontal(|ui| {
-                ui.add(
-                    egui::Label::new(RichText::new(text).font(theme::sans(10.5)).color(*color))
-                        .wrap(),
-                );
+        // One dense header row: title and version on the left, the state and
+        // the re-check action on the right. Only an available update adds the
+        // action row below the startup checkbox.
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            let _ = row_label(ui, self.t(Key::RowUpdates), self.t(Key::HintUpdates), 20.0);
+            ui.add_space(6.0);
+            ui.label(
+                RichText::new(&version)
+                    .font(theme::mono(9.5))
+                    .color(theme::dim()),
+            );
+
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                if show_check
+                    && widgets::text_button(
+                        ui,
+                        self.t(Key::UpdateCheck),
+                        theme::muted(),
+                        theme::accent(),
+                    )
+                    .clicked()
+                {
+                    check_clicked = true;
+                }
+
+                if let Some((text, color)) = &status {
+                    ui.add(
+                        egui::Label::new(RichText::new(text).font(theme::sans(10.0)).color(*color))
+                            .truncate(),
+                    )
+                    .on_hover_text(text);
+                }
+                // Keep the status clear of the version even when the row is
+                // tight; otherwise the two labels touch at 460 px.
+                ui.add_space(10.0);
             });
+        });
+
+        if let Some(message) = failure {
             ui.add_space(2.0);
+            ui.add(
+                egui::Label::new(
+                    RichText::new(message)
+                        .font(theme::sans(10.0))
+                        .color(theme::warning()),
+                )
+                .wrap(),
+            );
         }
 
-        if show_install || show_check || notes_url.is_some() {
+        ui.add_space(2.0);
+        let mut enabled = self.check_updates;
+        let mut startup_changed = false;
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            let response = widgets::checkbox(ui, &mut enabled, self.t(Key::UpdateCheckOnStart));
+            let _ = response.on_hover_text(self.t(Key::UpdateCheckOnStartHint));
+            startup_changed = enabled != self.check_updates;
+        });
+
+        // Only an available update adds a third row. Keeping these actions
+        // here avoids squeezing them against a long startup-checkbox label in
+        // languages such as Russian.
+        if show_install {
             ui.horizontal(|ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if show_install {
-                        ui.add_enabled_ui(!cfg!(debug_assertions), |ui| {
-                            if widgets::text_button(
-                                ui,
-                                self.t(Key::UpdateInstall),
-                                theme::accent(),
-                                theme::accent(),
-                            )
-                            .clicked()
-                            {
-                                if ready {
-                                    install_clicked = true;
-                                } else {
-                                    download_clicked = true;
-                                }
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    ui.add_enabled_ui(!cfg!(debug_assertions), |ui| {
+                        if widgets::text_button(
+                            ui,
+                            self.t(Key::UpdateInstall),
+                            theme::accent(),
+                            theme::accent(),
+                        )
+                        .clicked()
+                        {
+                            if ready {
+                                install_clicked = true;
+                            } else {
+                                download_clicked = true;
                             }
-                        });
-                    }
+                        }
+                    });
 
                     if let Some(url) = &notes_url {
                         if widgets::text_button(
@@ -901,20 +940,18 @@ impl GuiApp {
                             open_notes = Some(url.clone());
                         }
                     }
-
-                    if show_check
-                        && widgets::text_button(
-                            ui,
-                            self.t(Key::UpdateCheck),
-                            theme::muted(),
-                            theme::accent(),
-                        )
-                        .clicked()
-                    {
-                        check_clicked = true;
-                    }
                 });
             });
+        }
+
+        if startup_changed {
+            self.check_updates = enabled;
+            if enabled {
+                self.auto_check_at = Some(Instant::now());
+            } else {
+                self.auto_check_at = None;
+            }
+            self.save_config();
         }
 
         if cfg!(debug_assertions) && show_install {
@@ -924,27 +961,6 @@ impl GuiApp {
                     .font(theme::sans(10.0))
                     .color(theme::warning()),
             );
-        }
-
-        ui.add_space(3.0);
-        let mut enabled = self.check_updates;
-        let changed = compact_choice_row(
-            ui,
-            self.t(Key::UpdateCheckOnStart),
-            self.t(Key::UpdateCheckOnStartHint),
-            |ui| {
-                widgets::checkbox(ui, &mut enabled, self.t(Key::Enabled));
-                enabled != self.check_updates
-            },
-        );
-        if changed {
-            self.check_updates = enabled;
-            if enabled {
-                self.auto_check_at = Some(Instant::now());
-            } else {
-                self.auto_check_at = None;
-            }
-            self.save_config();
         }
 
         if check_clicked {
@@ -1169,6 +1185,10 @@ impl GuiApp {
             Theme::Plum => Key::ThemePlum,
             Theme::Wine => Key::ThemeWine,
             Theme::LiquidGlass => Key::ThemeLiquidGlass,
+            Theme::Halloween => Key::ThemeHalloween,
+            Theme::Winter => Key::ThemeWinter,
+            Theme::Neon => Key::ThemeNeon,
+            Theme::TerminalGreen => Key::ThemeTerminalGreen,
         })
     }
 
@@ -1595,7 +1615,7 @@ impl GuiApp {
     }
 
     fn draw_simple_body(&mut self, ui: &mut Ui) {
-        theme::card().show(ui, |ui| {
+        theme::card_show(ui, |ui| {
             ui.set_width(ui.available_width());
             self.draw_hero(ui);
         });
@@ -1608,7 +1628,7 @@ impl GuiApp {
         }
         ui.add_space(8.0);
 
-        theme::card().show(ui, |ui| {
+        theme::card_show(ui, |ui| {
             ui.set_width(ui.available_width());
             let mut draft = self.settings;
             let mut changed = false;
@@ -1906,21 +1926,16 @@ impl GuiApp {
         let mut draft = self.settings;
         let mut changed = false;
 
-        if draft.mode == ClickMode::Sequence {
-            ui.add_space(2.0);
-            ui.add(
-                egui::Label::new(
-                    RichText::new(self.t(Key::SequenceSpeedHint))
-                        .font(theme::sans(10.0))
-                        .color(theme::dim()),
-                )
-                .wrap(),
+        if draft.mode == ClickMode::Random {
+            let random_hint = format!(
+                "{} {}",
+                self.t(Key::HintRandomInterval),
+                self.t(Key::HintRandomClicks)
             );
-        } else if draft.mode == ClickMode::Random {
             changed |= compact_slider_row(
                 ui,
                 self.t(Key::RowRandomInterval),
-                self.t(Key::HintRandomInterval),
+                &random_hint,
                 &mut draft.random_interval_ms,
                 SliderSpec {
                     range: MIN_RANDOM_INTERVAL_MS as f64..=MAX_RANDOM_INTERVAL_MS as f64,
@@ -1931,10 +1946,19 @@ impl GuiApp {
                 },
             );
         } else {
+            let speed_hint = if draft.mode == ClickMode::Sequence {
+                format!(
+                    "{} {}",
+                    self.t(Key::HintSpeed),
+                    self.t(Key::SequenceSpeedHint)
+                )
+            } else {
+                self.t(Key::HintSpeed).to_string()
+            };
             changed |= compact_slider_row(
                 ui,
                 self.t(Key::RowSpeed),
-                self.t(Key::HintSpeed),
+                &speed_hint,
                 &mut draft.cps,
                 SliderSpec {
                     range: 0.2..=1000.0,
@@ -2030,32 +2054,26 @@ impl GuiApp {
             ClickMode::Cursor | ClickMode::Point => 1000.0 / draft.cps.max(0.2),
         };
         let effective_hold = draft.hold_ms.min((period_ms - 0.2).max(0.1));
-        let hint = if draft.mode == ClickMode::Random {
-            if draft.limit > 0 {
-                (
-                    theme::muted(),
-                    self.fill(Key::HintLimitOn, &[group_digits(draft.limit)]),
-                )
-            } else {
-                (theme::dim(), self.t(Key::HintRandomClicks).to_string())
-            }
-        } else if draft.hold_ms > effective_hold + 0.001 {
-            (
+        let feedback = if draft.mode != ClickMode::Random && draft.hold_ms > effective_hold + 0.001
+        {
+            Some((
                 theme::warning(),
                 self.fill(Key::HintHoldClamped, &[trim_number(effective_hold)]),
-            )
+            ))
         } else if draft.limit > 0 {
-            (
+            Some((
                 theme::muted(),
                 self.fill(Key::HintLimitOn, &[group_digits(draft.limit)]),
-            )
+            ))
         } else {
-            (theme::dim(), self.t(Key::HintLimitOff).to_string())
+            None
         };
-        ui.add_space(2.0);
-        ui.add(
-            egui::Label::new(RichText::new(hint.1).font(theme::sans(10.0)).color(hint.0)).wrap(),
-        );
+        if let Some((color, text)) = feedback {
+            ui.add_space(2.0);
+            ui.add(
+                egui::Label::new(RichText::new(text).font(theme::sans(10.0)).color(color)).wrap(),
+            );
+        }
 
         if changed {
             self.settings = draft;
@@ -2077,9 +2095,22 @@ impl GuiApp {
 
         let mut mode = draft.mode;
         let mut mode_changed = false;
-        ui.horizontal(|ui| {
+        let target_hint = match draft.mode {
+            ClickMode::Cursor => format!(
+                "{} {}",
+                self.t(Key::HintTarget),
+                self.t(Key::CursorModeHint)
+            ),
+            ClickMode::Random => format!(
+                "{} {}",
+                self.t(Key::HintTarget),
+                self.t(Key::HintRandomMode)
+            ),
+            _ => self.t(Key::HintTarget).to_string(),
+        };
+        let target_row = ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
-            let _ = row_label(ui, self.t(Key::RowTarget), self.t(Key::HintTarget), 24.0);
+            let _ = row_label_bare(ui, self.t(Key::RowTarget), 24.0);
 
             ui.allocate_ui_with_layout(
                 Vec2::new(ui.available_width(), 24.0),
@@ -2099,6 +2130,7 @@ impl GuiApp {
                 },
             );
         });
+        let _ = target_row.response.on_hover_text(&target_hint);
         if mode_changed {
             match mode {
                 ClickMode::Point if draft.target.is_none() => {
@@ -2129,18 +2161,6 @@ impl GuiApp {
             }
         }
 
-        if draft.mode == ClickMode::Random {
-            ui.add_space(2.0);
-            ui.add(
-                egui::Label::new(
-                    RichText::new(self.t(Key::HintRandomMode))
-                        .font(theme::sans(10.0))
-                        .color(theme::dim()),
-                )
-                .wrap(),
-            );
-        }
-
         if draft.mode == ClickMode::Point && draft.target.is_none() {
             draft.target = Some(crate::backend::cursor_position().unwrap_or(Point::new(0, 0)));
             changed = true;
@@ -2163,9 +2183,9 @@ impl GuiApp {
             );
 
             theme::rule(ui);
-            ui.horizontal(|ui| {
+            let points_row = ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
-                let _ = row_label(ui, self.t(Key::RowPoints), self.t(Key::HintPoints), 22.0);
+                let _ = row_label_bare(ui, self.t(Key::RowPoints), 22.0);
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let enabled = draft.point_count() < MAX_POINTS;
@@ -2188,6 +2208,7 @@ impl GuiApp {
                     );
                 });
             });
+            let _ = points_row.response.on_hover_text(self.t(Key::HintPoints));
 
             if draft.point_count() == 0 {
                 ui.add_space(2.0);
@@ -2264,9 +2285,9 @@ impl GuiApp {
                     .is_some_and(|pipette| pipette.target == PipetteTarget::Point);
                 let mut point_value = *point;
 
-                ui.horizontal(|ui| {
+                let coords_row = ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 6.0;
-                    let _ = row_label(ui, self.t(Key::RowCoords), self.t(Key::HintCoords), 22.0);
+                    let _ = row_label_bare(ui, self.t(Key::RowCoords), 22.0);
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.add_enabled_ui(blocked.is_none(), |ui| {
@@ -2287,54 +2308,35 @@ impl GuiApp {
                         );
                     });
                 });
+                let _ = coords_row.response.on_hover_text(self.t(Key::HintCoords));
 
                 if point_value != *point {
                     *point = point_value;
                     changed = true;
                 }
             }
-        } else {
-            ui.add_space(3.0);
-            ui.add(
-                egui::Label::new(
-                    RichText::new(self.t(Key::CursorModeHint))
-                        .font(theme::sans(10.0))
-                        .color(theme::dim()),
-                )
-                .wrap(),
-            );
         }
 
         theme::rule(ui);
 
         let mut multi = draft.multi_click;
-        let multi_changed =
-            compact_choice_row(ui, self.t(Key::RowMulti), self.t(Key::HintMulti), |ui| {
-                widgets::segmented(
-                    ui,
-                    "multi_click",
-                    &mut multi,
-                    &[
-                        (1, self.t(Key::MultiOne)),
-                        (2, self.t(Key::MultiDouble)),
-                        (3, self.t(Key::MultiTriple)),
-                    ],
-                )
-            });
+        let multi_hint = format!("{} {}", self.t(Key::HintMulti), self.t(Key::MultiHint));
+        let multi_changed = compact_choice_row(ui, self.t(Key::RowMulti), &multi_hint, |ui| {
+            widgets::segmented(
+                ui,
+                "multi_click",
+                &mut multi,
+                &[
+                    (1, self.t(Key::MultiOne)),
+                    (2, self.t(Key::MultiDouble)),
+                    (3, self.t(Key::MultiTriple)),
+                ],
+            )
+        });
         if multi_changed {
             draft.multi_click = multi;
             changed = true;
         }
-
-        ui.add_space(3.0);
-        ui.add(
-            egui::Label::new(
-                RichText::new(self.t(Key::MultiHint))
-                    .font(theme::sans(10.0))
-                    .color(theme::dim()),
-            )
-            .wrap(),
-        );
 
         if let Some(index) = remove_point {
             draft.remove_point(index);
@@ -2439,15 +2441,15 @@ impl GuiApp {
 
         if crate::autostart::SUPPORTED {
             let mut enabled = self.autostart_enabled;
-            let changed = compact_choice_row(
-                ui,
-                self.t(Key::RowAutostart),
+            let hint = format!(
+                "{} {}",
                 self.t(Key::HintAutostart),
-                |ui| {
-                    widgets::checkbox(ui, &mut enabled, self.t(Key::Enabled));
-                    enabled != self.autostart_enabled
-                },
+                self.t(Key::AutostartHint)
             );
+            let changed = compact_choice_row(ui, self.t(Key::RowAutostart), &hint, |ui| {
+                widgets::checkbox(ui, &mut enabled, self.t(Key::Enabled));
+                enabled != self.autostart_enabled
+            });
 
             if changed && enabled != self.autostart_enabled {
                 let start_hidden = enabled && self.minimize_to_tray;
@@ -2469,16 +2471,6 @@ impl GuiApp {
                     }
                 }
             }
-
-            ui.add_space(3.0);
-            ui.add(
-                egui::Label::new(
-                    RichText::new(self.t(Key::AutostartHint))
-                        .font(theme::sans(10.0))
-                        .color(theme::dim()),
-                )
-                .wrap(),
-            );
         } else {
             let _ = row_label(
                 ui,
@@ -2521,16 +2513,6 @@ impl GuiApp {
                 }
                 self.save_config();
             }
-
-            ui.add_space(3.0);
-            ui.add(
-                egui::Label::new(
-                    RichText::new(self.t(Key::HintMinimizeTray))
-                        .font(theme::sans(10.0))
-                        .color(theme::dim()),
-                )
-                .wrap(),
-            );
 
             if !self.elevated {
                 theme::rule(ui);
@@ -2591,14 +2573,7 @@ impl GuiApp {
 
         let modal = egui::Modal::new(egui::Id::new(spec.id))
             .backdrop_color(Color32::from_black_alpha(120))
-            .frame(
-                Frame::new()
-                    .fill(theme::panel())
-                    .stroke(Stroke::new(1.0_f32, theme::line()))
-                    .corner_radius(CornerRadius::same(16))
-                    .inner_margin(Margin::same(24))
-                    .shadow(theme::shadow()),
-            )
+            .frame(theme::dialog())
             .show(ctx, |ui| {
                 ui.set_width(360.0);
                 ui.label(
@@ -2655,6 +2630,8 @@ impl GuiApp {
                     });
                 });
             });
+
+        theme::paint_dialog_edge(ctx, modal.response.layer_id, modal.response.rect);
 
         if modal.should_close() {
             close = true;
@@ -2733,14 +2710,13 @@ impl GuiApp {
                 if response.clicked() {
                     start = Some(RecordTarget::Toggle);
                 }
-                let response = if self.daemon_hotkey_active.is_empty() {
-                    response
+                if self.daemon_hotkey_active.is_empty() {
+                    response.on_hover_text(self.t(Key::HotkeyHint));
                 } else {
                     response.on_hover_text(
                         self.fill(Key::Registered, &[hotkey_label(&self.daemon_hotkey_active)]),
-                    )
-                };
-                let _ = response;
+                    );
+                }
             });
         });
 
@@ -2777,12 +2753,14 @@ impl GuiApp {
                         Key::Registered,
                         &[hotkey_label(&self.daemon_hold_hotkey_active)],
                     ));
+                } else {
+                    let _ = response.on_hover_text(self.t(Key::HotkeyHint));
                 }
             });
         });
 
         let hint = if let Some(target) = self.recording {
-            (
+            Some((
                 theme::accent(),
                 self.fill(
                     Key::RecordHint,
@@ -2792,18 +2770,20 @@ impl GuiApp {
                     }
                     .to_string()],
                 ),
-            )
+            ))
         } else if let Some(error) = &self.daemon_hotkey_error {
-            (theme::danger(), error.clone())
+            Some((theme::danger(), error.clone()))
         } else if self.daemon_hotkey_paused {
-            (theme::muted(), self.t(Key::HotkeyPaused).to_string())
+            Some((theme::muted(), self.t(Key::HotkeyPaused).to_string()))
         } else {
-            (theme::dim(), self.t(Key::HotkeyHint).to_string())
+            None
         };
-        ui.add_space(6.0);
-        ui.add(
-            egui::Label::new(RichText::new(hint.1).font(theme::sans(10.0)).color(hint.0)).wrap(),
-        );
+        if let Some((color, text)) = hint {
+            ui.add_space(6.0);
+            ui.add(
+                egui::Label::new(RichText::new(text).font(theme::sans(10.0)).color(color)).wrap(),
+            );
+        }
 
         if let Some(target) = start {
             if self.recording == Some(target) {
@@ -2819,8 +2799,14 @@ impl GuiApp {
     fn draw_hotkeys_tab(&mut self, ui: &mut Ui) {
         let bind = self.toggle_bind();
 
+        let global_hint = format!(
+            "{} {} {}",
+            self.t(Key::HintGlobal),
+            self.t(Key::BindHint),
+            self.t(Key::HoldWindowsOnly)
+        );
         ui.horizontal(|ui| {
-            let _ = row_label(ui, self.t(Key::RowGlobal), self.t(Key::HintGlobal), 22.0);
+            let _ = row_label(ui, self.t(Key::RowGlobal), &global_hint, 22.0);
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let response = ui.add(
@@ -2840,29 +2826,6 @@ impl GuiApp {
                 }
             });
         });
-
-        theme::rule(ui);
-
-        ui.add_space(6.0);
-        ui.add(
-            egui::Label::new(
-                RichText::new(self.t(Key::BindHint))
-                    .font(theme::sans(10.0))
-                    .color(theme::dim()),
-            )
-            .wrap(),
-        );
-        ui.add_space(6.0);
-        ui.add(
-            egui::Label::new(
-                RichText::new(self.t(Key::HoldWindowsOnly))
-                    .font(theme::sans(10.0))
-                    .color(theme::dim()),
-            )
-            .wrap(),
-        );
-
-        let _ = &self.hold_hotkey;
     }
 
     #[cfg(not(windows))]
@@ -2998,19 +2961,25 @@ impl egui_software_backend::App for GuiApp {
             .show_inside(ui, |ui| {
                 #[cfg(not(windows))]
                 if !self.simple_mode {
+                    // Keep the footer pinned, but draw it as a regular card so
+                    // it matches the hero and tab sections instead of reading
+                    // as a flat full-width bar.
                     egui::Panel::bottom("daemon_footer")
                         .frame(
                             Frame::new()
-                                .fill(theme::bar_fill())
-                                .inner_margin(Margin::symmetric(0, 4)),
+                                .fill(Color32::TRANSPARENT)
+                                .inner_margin(Margin::symmetric(0, 0)),
                         )
                         .show_separator_line(false)
                         .show_inside(ui, |ui| {
                             ui.vertical_centered(|ui| {
                                 ui.set_max_width(ui.available_width().min(CONTENT_WIDTH));
-                                theme::rule(ui);
-                                ui.add_space(3.0);
-                                self.draw_footer(ui);
+                                ui.add_space(6.0);
+                                theme::card_show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+                                    self.draw_footer(ui);
+                                });
+                                ui.add_space(8.0);
                             });
                         });
                 }
@@ -3023,7 +2992,7 @@ impl egui_software_backend::App for GuiApp {
                     if self.simple_mode {
                         self.draw_simple_body(ui);
                     } else {
-                        theme::card().show(ui, |ui| {
+                        theme::card_show(ui, |ui| {
                             ui.set_width(ui.available_width());
                             self.draw_hero(ui);
                             self.draw_metrics(ui);
@@ -3038,7 +3007,7 @@ impl egui_software_backend::App for GuiApp {
                             .id_salt(("tab_scroll", self.tab))
                             .auto_shrink([false, false])
                             .show(ui, |ui| {
-                                theme::card().show(ui, |ui| {
+                                theme::card_show(ui, |ui| {
                                     ui.set_width(ui.available_width());
                                     match self.tab {
                                         Tab::Clicks => self.draw_clicks_tab(ui),
@@ -3177,6 +3146,12 @@ fn auto_scale_for(monitor_size: Vec2, zoom_factor: f32, window: [f32; 2]) -> f32
 }
 
 fn row_label(ui: &mut Ui, title: &str, hint: &str, height: f32) -> egui::Response {
+    row_label_bare(ui, title, height).on_hover_text(hint)
+}
+
+/// Row title without its own tooltip. Rows that own the hover surface use this
+/// so the hint is shown once, from the full row, instead of twice.
+fn row_label_bare(ui: &mut Ui, title: &str, height: f32) -> egui::Response {
     let galley =
         ui.painter()
             .layout_no_wrap(title.to_owned(), theme::sans_medium(12.5), theme::text());
@@ -3186,7 +3161,7 @@ fn row_label(ui: &mut Ui, title: &str, hint: &str, height: f32) -> egui::Respons
         galley,
         theme::text(),
     );
-    response.on_hover_text(hint)
+    response
 }
 
 fn compact_slider_row(
@@ -3198,11 +3173,11 @@ fn compact_slider_row(
 ) -> bool {
     let mut changed = false;
 
-    ui.horizontal(|ui| {
+    let row = ui.horizontal(|ui| {
         // Zero implicit spacing + explicit gaps keeps the right edge of the
         // input group exactly on the card grid for every suffix width.
         ui.spacing_mut().item_spacing.x = 0.0;
-        let _ = row_label(ui, title, hint, 20.0);
+        let _ = row_label_bare(ui, title, 20.0);
         ui.add_space(6.0);
 
         let field_width = widgets::numeric_row_width();
@@ -3235,6 +3210,7 @@ fn compact_slider_row(
             );
         });
     });
+    let _ = row.response.on_hover_text(hint);
 
     changed
 }
@@ -3249,15 +3225,16 @@ fn compact_integer_row(
 ) -> bool {
     let mut changed = false;
 
-    ui.horizontal(|ui| {
+    let row = ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        let _ = row_label(ui, title, hint, 20.0);
+        let _ = row_label_bare(ui, title, 20.0);
         ui.add_space(6.0);
 
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             changed |= widgets::integer_field(ui, value, range, 1.0, suffix);
         });
     });
+    let _ = row.response.on_hover_text(hint);
 
     changed
 }
@@ -3274,9 +3251,9 @@ fn compact_choice_row(
 ) -> bool {
     let mut changed = false;
 
-    ui.horizontal(|ui| {
+    let row = ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        let _ = row_label(ui, title, hint, 20.0);
+        let _ = row_label_bare(ui, title, 20.0);
         ui.add_space(6.0);
 
         ui.allocate_ui_with_layout(
@@ -3285,6 +3262,7 @@ fn compact_choice_row(
             |ui| changed = add(ui),
         );
     });
+    let _ = row.response.on_hover_text(hint);
 
     changed
 }
@@ -3320,9 +3298,9 @@ fn hotkey_field(
     .fill(if recording {
         theme::alpha(theme::accent(), 10)
     } else {
-        theme::panel()
+        theme::field()
     })
-    .stroke(Stroke::new(
+    .stroke(egui::Stroke::new(
         1.0_f32,
         if recording {
             theme::accent()

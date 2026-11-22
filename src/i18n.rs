@@ -157,13 +157,32 @@ define_strings! {
         "Vidrio líquido",
         "Vidro líquido"
     ],
+    ThemeHalloween: [
+        "Halloween",
+        "Хэллоуин",
+        "Halloween",
+        "Halloween",
+        "Halloween",
+        "Halloween"
+    ],
+    ThemeWinter: [
+        "Winter / New Year",
+        "Зима / Новый год",
+        "Winter / Neujahr",
+        "Hiver / Nouvel an",
+        "Invierno / Año Nuevo",
+        "Inverno / Ano Novo"
+    ],
+    ThemeNeon: ["Neon", "Неон", "Neon", "Néon", "Neón", "Néon"],
+    ThemeTerminalGreen: [
+        "Terminal Green",
+        "Зелёный терминал",
+        "Terminalgrün",
+        "Vert terminal",
+        "Verde terminal",
+        "Verde terminal"
+    ],
     ThemeNotice: ["Theme: {}.", "Тема: {}.", "Design: {}.", "Thème : {}.", "Tema: {}.", "Tema: {}."],
-    StatusStarting: ["STARTING", "ЗАПУСК", "START", "DÉMARRAGE", "INICIANDO", "INICIANDO"],
-    StatusStopping: ["STOPPING", "ОСТАНОВКА", "STOPPEN", "ARRÊT", "DETENIENDO", "PARANDO"],
-    StatusOffline: ["OFFLINE", "НЕТ СВЯЗИ", "OFFLINE", "HORS LIGNE", "SIN CONEXIÓN", "SEM CONEXÃO"],
-    StatusDelay: ["DELAY", "ЗАДЕРЖКА", "WARTEN", "DÉLAI", "RETRASO", "ATRASO"],
-    StatusActive: ["ACTIVE", "АКТИВЕН", "AKTIV", "ACTIF", "ACTIVO", "ATIVO"],
-    StatusIdle: ["IDLE", "ОЖИДАНИЕ", "BEREIT", "EN ATTENTE", "EN ESPERA", "OCIOSO"],
     HeroStarting: ["Starting…", "Запуск…", "Startet…", "Démarrage…", "Iniciando…", "Iniciando…"],
     HeroStopping: ["Stopping…", "Остановка…", "Wird gestoppt…", "Arrêt…", "Deteniendo…", "Parando…"],
     HeroWaitDaemon: [
@@ -410,14 +429,6 @@ define_strings! {
         "Limite de {} clics par session ; 0 désactive la limite.",
         "Límite de {} clics por sesión; 0 desactiva el límite.",
         "Limite de {} cliques por sessão; 0 desativa o limite."
-    ],
-    HintLimitOff: [
-        "Limit 0 means unlimited. The delay applies only at start.",
-        "Лимит 0 — без ограничения. Задержка действует только на старте.",
-        "Limit 0 bedeutet unbegrenzt. Die Verzögerung gilt nur beim Start.",
-        "Limite 0 signifie illimité. Le délai ne s'applique qu'au démarrage.",
-        "Límite 0 significa ilimitado. El retraso solo se aplica al inicio.",
-        "Limite 0 significa ilimitado. O atraso só se aplica no início."
     ],
     RowTarget: ["Target", "Цель", "Ziel", "Cible", "Objetivo", "Alvo"],
     HintTarget: [
@@ -939,12 +950,12 @@ define_strings! {
         "Procurar uma versão mais recente no GitHub"
     ],
     UpdateCheck: [
-        "Check for updates",
-        "Проверить обновления",
-        "Nach Updates suchen",
-        "Rechercher des mises à jour",
-        "Buscar actualizaciones",
-        "Verificar atualizações"
+        "Check",
+        "Проверить",
+        "Prüfen",
+        "Vérifier",
+        "Buscar",
+        "Verificar"
     ],
     UpdateChecking: [
         "Checking…",
@@ -955,12 +966,12 @@ define_strings! {
         "Verificando…"
     ],
     UpdateCurrent: [
-        "You have the latest version",
-        "У вас последняя версия",
-        "Sie haben die neueste Version",
-        "Vous avez la dernière version",
-        "Tiene la última versión",
-        "Tem a versão mais recente"
+        "Up to date",
+        "Актуально",
+        "Aktuell",
+        "À jour",
+        "Al día",
+        "Atualizado"
     ],
     UpdateAvailable: [
         "Version {} is available",
@@ -1043,12 +1054,12 @@ define_strings! {
         "INSTALAR E REINICIAR"
     ],
     UpdateCheckOnStart: [
-        "Check at startup",
-        "Проверять при запуске",
-        "Beim Start prüfen",
-        "Vérifier au démarrage",
-        "Comprobar al iniciar",
-        "Verificar ao iniciar"
+        "Check update at startup",
+        "Проверять обновление при запуске",
+        "Update beim Start prüfen",
+        "Vérifier les mises à jour au démarrage",
+        "Buscar actualización al iniciar",
+        "Verificar atualização ao iniciar"
     ],
     UpdateCheckOnStartHint: [
         "Look for a new release when the window opens",

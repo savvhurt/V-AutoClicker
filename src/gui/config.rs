@@ -33,10 +33,14 @@ pub enum Theme {
     Plum,
     Wine,
     LiquidGlass,
+    Halloween,
+    Winter,
+    Neon,
+    TerminalGreen,
 }
 
 impl Theme {
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 23] = [
         Self::Paper,
         Self::Graphite,
         Self::Sand,
@@ -56,6 +60,10 @@ impl Theme {
         Self::Plum,
         Self::Wine,
         Self::LiquidGlass,
+        Self::Halloween,
+        Self::Winter,
+        Self::Neon,
+        Self::TerminalGreen,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -79,6 +87,10 @@ impl Theme {
             Self::Plum => "plum",
             Self::Wine => "wine",
             Self::LiquidGlass => "liquidglass",
+            Self::Halloween => "halloween",
+            Self::Winter => "winter",
+            Self::Neon => "neon",
+            Self::TerminalGreen => "terminal",
         }
     }
 
@@ -111,36 +123,36 @@ impl Theme {
             | "glass"
             | "стекло"
             | "жидкое стекло" => Some(Self::LiquidGlass),
+            "halloween" | "хэллоуин" | "хеллоуин" => Some(Self::Halloween),
+            "winter"
+            | "newyear"
+            | "new-year"
+            | "new_year"
+            | "new year"
+            | "зима"
+            | "новый год"
+            | "новогодняя" => Some(Self::Winter),
+            "neon" | "неон" => Some(Self::Neon),
+            "terminal"
+            | "terminalgreen"
+            | "terminal-green"
+            | "terminal_green"
+            | "terminal green"
+            | "терминал"
+            | "зелёный терминал"
+            | "зеленый терминал" => Some(Self::TerminalGreen),
             _ => None,
         }
     }
 
     pub fn index(self) -> usize {
-        match self {
-            Self::Paper => 0,
-            Self::Graphite => 1,
-            Self::Sand => 2,
-            Self::Ocean => 3,
-            Self::Forest => 4,
-            Self::Contrast => 5,
-            Self::Rose => 6,
-            Self::Lavender => 7,
-            Self::Midnight => 8,
-            Self::Nord => 9,
-            Self::Coffee => 10,
-            Self::Matcha => 11,
-            Self::Glacier => 12,
-            Self::Apricot => 13,
-            Self::Mint => 14,
-            Self::Ember => 15,
-            Self::Plum => 16,
-            Self::Wine => 17,
-            Self::LiquidGlass => 18,
-        }
+        // The enum is fieldless and in the same order as `ALL`, so the
+        // discriminant is already the index.
+        self as usize
     }
 
     pub fn from_index(index: usize) -> Self {
-        Self::ALL[index.min(Self::ALL.len() - 1)]
+        Self::ALL.get(index).copied().unwrap_or(Self::Paper)
     }
 
     pub fn is_dark(self) -> bool {
@@ -155,6 +167,9 @@ impl Theme {
                 | Self::Ember
                 | Self::Plum
                 | Self::Wine
+                | Self::Halloween
+                | Self::Neon
+                | Self::TerminalGreen
         )
     }
 }
@@ -722,9 +737,16 @@ mod tests {
         assert_eq!(Theme::parse("вино"), Some(Theme::Wine));
         assert_eq!(Theme::parse("liquid-glass"), Some(Theme::LiquidGlass));
         assert_eq!(Theme::parse("Стекло"), Some(Theme::LiquidGlass));
-        assert_eq!(Theme::parse("neon"), None);
+        assert_eq!(Theme::parse("neon"), Some(Theme::Neon));
+        assert_eq!(Theme::parse("НЕОН"), Some(Theme::Neon));
+        assert_eq!(Theme::parse("halloween"), Some(Theme::Halloween));
+        assert_eq!(Theme::parse("хэллоуин"), Some(Theme::Halloween));
+        assert_eq!(Theme::parse("new-year"), Some(Theme::Winter));
+        assert_eq!(Theme::parse("новый год"), Some(Theme::Winter));
+        assert_eq!(Theme::parse("terminal-green"), Some(Theme::TerminalGreen));
+        assert_eq!(Theme::parse("терминал"), Some(Theme::TerminalGreen));
 
-        assert_eq!(Theme::ALL.len(), 19);
+        assert_eq!(Theme::ALL.len(), 23);
         for theme in Theme::ALL {
             assert_eq!(Theme::parse(theme.as_str()), Some(theme));
             assert_eq!(Theme::from_index(theme.index()), theme);
@@ -745,6 +767,9 @@ mod tests {
                     | Theme::Ember
                     | Theme::Plum
                     | Theme::Wine
+                    | Theme::Halloween
+                    | Theme::Neon
+                    | Theme::TerminalGreen
             );
             assert_eq!(theme.is_dark(), expected, "{theme:?}");
         }
