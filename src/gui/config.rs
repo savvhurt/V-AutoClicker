@@ -37,10 +37,16 @@ pub enum Theme {
     Winter,
     Neon,
     TerminalGreen,
+    Spring,
+    Summer,
+    Autumn,
+    Valentine,
+    Galaxy,
+    Aurora,
 }
 
 impl Theme {
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 29] = [
         Self::Paper,
         Self::Graphite,
         Self::Sand,
@@ -64,6 +70,12 @@ impl Theme {
         Self::Winter,
         Self::Neon,
         Self::TerminalGreen,
+        Self::Spring,
+        Self::Summer,
+        Self::Autumn,
+        Self::Valentine,
+        Self::Galaxy,
+        Self::Aurora,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -91,6 +103,12 @@ impl Theme {
             Self::Winter => "winter",
             Self::Neon => "neon",
             Self::TerminalGreen => "terminal",
+            Self::Spring => "spring",
+            Self::Summer => "summer",
+            Self::Autumn => "autumn",
+            Self::Valentine => "valentine",
+            Self::Galaxy => "galaxy",
+            Self::Aurora => "aurora",
         }
     }
 
@@ -141,6 +159,28 @@ impl Theme {
             | "терминал"
             | "зелёный терминал"
             | "зеленый терминал" => Some(Self::TerminalGreen),
+            "spring" | "sakura" | "blossom" | "весна" | "сакура" | "цветение" => {
+                Some(Self::Spring)
+            }
+            "summer" | "beach" | "лето" | "пляж" | "море" => Some(Self::Summer),
+            "autumn" | "fall" | "leaves" | "осень" | "листья" => Some(Self::Autumn),
+            "valentine"
+            | "valentines"
+            | "valentine's day"
+            | "valentines day"
+            | "love"
+            | "валентин"
+            | "день святого валентина"
+            | "любовь" => Some(Self::Valentine),
+            "galaxy" | "space" | "cosmos" | "галактика" | "космос" => {
+                Some(Self::Galaxy)
+            }
+            "aurora"
+            | "northern lights"
+            | "aurora borealis"
+            | "аврора"
+            | "северное сияние"
+            | "сияние" => Some(Self::Aurora),
             _ => None,
         }
     }
@@ -170,6 +210,8 @@ impl Theme {
                 | Self::Halloween
                 | Self::Neon
                 | Self::TerminalGreen
+                | Self::Galaxy
+                | Self::Aurora
         )
     }
 }
@@ -745,8 +787,23 @@ mod tests {
         assert_eq!(Theme::parse("новый год"), Some(Theme::Winter));
         assert_eq!(Theme::parse("terminal-green"), Some(Theme::TerminalGreen));
         assert_eq!(Theme::parse("терминал"), Some(Theme::TerminalGreen));
+        assert_eq!(Theme::parse("sakura"), Some(Theme::Spring));
+        assert_eq!(Theme::parse("Весна"), Some(Theme::Spring));
+        assert_eq!(Theme::parse("beach"), Some(Theme::Summer));
+        assert_eq!(Theme::parse("пляж"), Some(Theme::Summer));
+        assert_eq!(Theme::parse("fall"), Some(Theme::Autumn));
+        assert_eq!(Theme::parse("осень"), Some(Theme::Autumn));
+        assert_eq!(Theme::parse("love"), Some(Theme::Valentine));
+        assert_eq!(
+            Theme::parse("день святого валентина"),
+            Some(Theme::Valentine)
+        );
+        assert_eq!(Theme::parse("space"), Some(Theme::Galaxy));
+        assert_eq!(Theme::parse("космос"), Some(Theme::Galaxy));
+        assert_eq!(Theme::parse("northern lights"), Some(Theme::Aurora));
+        assert_eq!(Theme::parse("северное сияние"), Some(Theme::Aurora));
 
-        assert_eq!(Theme::ALL.len(), 23);
+        assert_eq!(Theme::ALL.len(), 29);
         for theme in Theme::ALL {
             assert_eq!(Theme::parse(theme.as_str()), Some(theme));
             assert_eq!(Theme::from_index(theme.index()), theme);
@@ -770,6 +827,8 @@ mod tests {
                     | Theme::Halloween
                     | Theme::Neon
                     | Theme::TerminalGreen
+                    | Theme::Galaxy
+                    | Theme::Aurora
             );
             assert_eq!(theme.is_dark(), expected, "{theme:?}");
         }

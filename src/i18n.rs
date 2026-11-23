@@ -182,6 +182,54 @@ define_strings! {
         "Verde terminal",
         "Verde terminal"
     ],
+    ThemeSpring: [
+        "Spring / Sakura",
+        "Весна / Сакура",
+        "Frühling / Sakura",
+        "Printemps / Sakura",
+        "Primavera / Sakura",
+        "Primavera / Sakura"
+    ],
+    ThemeSummer: [
+        "Summer / Beach",
+        "Лето / Пляж",
+        "Sommer / Strand",
+        "Été / Plage",
+        "Verano / Playa",
+        "Verão / Praia"
+    ],
+    ThemeAutumn: [
+        "Autumn / Leaves",
+        "Осень / Листья",
+        "Herbst / Blätter",
+        "Automne / Feuilles",
+        "Otoño / Hojas",
+        "Outono / Folhas"
+    ],
+    ThemeValentine: [
+        "Valentine's Day",
+        "День святого Валентина",
+        "Valentinstag",
+        "Saint-Valentin",
+        "San Valentín",
+        "Dia dos Namorados"
+    ],
+    ThemeGalaxy: [
+        "Galaxy",
+        "Космос / Галактика",
+        "Galaxie",
+        "Galaxie",
+        "Galaxia",
+        "Galáxia"
+    ],
+    ThemeAurora: [
+        "Aurora",
+        "Северное сияние",
+        "Polarlicht",
+        "Aurore boréale",
+        "Aurora boreal",
+        "Aurora boreal"
+    ],
     ThemeNotice: ["Theme: {}.", "Тема: {}.", "Design: {}.", "Thème : {}.", "Tema: {}.", "Tema: {}."],
     HeroStarting: ["Starting…", "Запуск…", "Startet…", "Démarrage…", "Iniciando…", "Iniciando…"],
     HeroStopping: ["Stopping…", "Остановка…", "Wird gestoppt…", "Arrêt…", "Deteniendo…", "Parando…"],

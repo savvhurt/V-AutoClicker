@@ -18,7 +18,7 @@
 # V-AutoClicker
 
 **A fast, minimal, lightweight autoclicker written on Rust for Windows and Linux.**<br>
-Native input, four click modes, twenty-three themes, one small binary.
+Native input, four click modes, twenty-nine themes, one small binary.
 
 [Download](https://github.com/savvhurt/V-AutoClicker/releases/latest) ·
 [CLI](#cli) ·
@@ -43,8 +43,8 @@ Native input, four click modes, twenty-three themes, one small binary.
 - **Always on top** on Windows and X11, with a pin in the top bar.
 - **Built-in updates**: the System tab checks GitHub, verifies the SHA-256 and
   installs a new version in place.
-- **23 themes**, including **Liquid Glass**, Halloween, Winter / New Year, Neon
-  and Terminal Green, six interface languages and automatic DPI scaling.
+- **29 themes**, including **Liquid Glass**, seasonal wallpapers, space and
+  neon, six interface languages and automatic DPI scaling.
 - **One binary**: no arguments opens the GUI, subcommands stay on the CLI.
 - Settings live in `gui.toml` and are saved automatically.
 
@@ -236,7 +236,7 @@ Available themes:
 
 | Light | Dark |
 |---|---|
-| Paper, Sand, Contrast, Rose, Lavender, Coffee, Glacier, Apricot, Mint, Liquid Glass, Winter / New Year | Graphite, Ocean, Forest, Midnight, Nord, Matcha, Ember, Plum, Wine, Halloween, Neon, Terminal Green |
+| Paper, Sand, Contrast, Rose, Lavender, Coffee, Glacier, Apricot, Mint, Liquid Glass, Winter / New Year, Spring / Sakura, Summer / Beach, Autumn / Leaves, Valentine's Day | Graphite, Ocean, Forest, Midnight, Nord, Matcha, Ember, Plum, Wine, Halloween, Neon, Terminal Green, Galaxy, Aurora |
 
 **Liquid Glass** is inspired by macOS and iOS: a bright multi-color backdrop
 with translucent cards, thin white specular edges, dark hairlines and rounded
@@ -246,14 +246,26 @@ OS blur and looks the same on every compositor.
 Hover a control or its row to see its description; warnings, errors and
 session status stay visible under the controls instead of hiding in a tooltip.
 
-The four seasonal and neon themes add a static wallpaper behind the same
-translucent cards:
+The seasonal, cosmic and neon themes add a static wallpaper behind the normal
+cards:
 
 - **Halloween** — dark plum night with orange light and small bat silhouettes.
 - **Winter / New Year** — light frosty blue surfaces, a gold accent and snow.
+- **Spring / Sakura** — pale pink and mint sky with soft hills and drifting
+  petals.
+- **Summer / Beach** — blue sky, sun, sea horizon and small waves.
+- **Autumn / Leaves** — warm amber light with rust-coloured falling leaves.
+- **Valentine's Day** — rose gradient with bokeh and floating hearts.
+- **Galaxy** — deep space with stars, nebula clouds and a ringed planet.
+- **Aurora** — dark polar sky with stars and green-violet aurora ribbons.
 - **Neon** — near-black background with cyan and magenta glow and a faint grid.
 - **Terminal Green** — phosphor green on black, scanlines, and a monospaced
   interface.
+
+<p align="center">
+  <img src="docs/gui-spring.png" alt="V-AutoClicker Spring / Sakura theme" height="400">
+  <img src="docs/gui-galaxy.png" alt="V-AutoClicker Galaxy theme" height="400">
+</p>
 
 <p align="center">
   <img src="docs/gui-glass.png" alt="V-AutoClicker Liquid Glass theme" width="460">

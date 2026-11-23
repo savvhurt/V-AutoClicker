@@ -1189,6 +1189,12 @@ impl GuiApp {
             Theme::Winter => Key::ThemeWinter,
             Theme::Neon => Key::ThemeNeon,
             Theme::TerminalGreen => Key::ThemeTerminalGreen,
+            Theme::Spring => Key::ThemeSpring,
+            Theme::Summer => Key::ThemeSummer,
+            Theme::Autumn => Key::ThemeAutumn,
+            Theme::Valentine => Key::ThemeValentine,
+            Theme::Galaxy => Key::ThemeGalaxy,
+            Theme::Aurora => Key::ThemeAurora,
         })
     }
 

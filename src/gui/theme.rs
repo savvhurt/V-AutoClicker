@@ -409,6 +409,104 @@ const TERMINAL_GREEN: Palette = Palette {
     accent: Color32::from_rgb(57, 255, 106),
 };
 
+// Seasonal wallpapers. These keep the normal opaque cards so the painted
+// backdrop is the star of the show, just like Halloween and Winter.
+const SPRING: Palette = Palette {
+    dark: false,
+    glass: false,
+    bg: Color32::from_rgb(251, 241, 246),
+    panel: Color32::from_rgb(255, 249, 252),
+    input: Color32::from_rgb(247, 228, 238),
+    line: Color32::from_rgb(232, 198, 215),
+    line_soft: Color32::from_rgb(242, 220, 230),
+    text: Color32::from_rgb(59, 36, 49),
+    muted: Color32::from_rgb(138, 98, 116),
+    dim: Color32::from_rgb(184, 144, 160),
+    warning: Color32::from_rgb(168, 100, 0),
+    danger: Color32::from_rgb(192, 54, 77),
+    accent: Color32::from_rgb(214, 76, 134),
+};
+
+const SUMMER: Palette = Palette {
+    dark: false,
+    glass: false,
+    bg: Color32::from_rgb(233, 246, 251),
+    panel: Color32::from_rgb(248, 252, 254),
+    input: Color32::from_rgb(221, 240, 247),
+    line: Color32::from_rgb(183, 220, 232),
+    line_soft: Color32::from_rgb(207, 232, 241),
+    text: Color32::from_rgb(18, 52, 64),
+    muted: Color32::from_rgb(77, 116, 128),
+    dim: Color32::from_rgb(132, 166, 177),
+    warning: Color32::from_rgb(169, 104, 0),
+    danger: Color32::from_rgb(194, 58, 58),
+    accent: Color32::from_rgb(14, 151, 190),
+};
+
+const AUTUMN: Palette = Palette {
+    dark: false,
+    glass: false,
+    bg: Color32::from_rgb(250, 239, 225),
+    panel: Color32::from_rgb(255, 248, 239),
+    input: Color32::from_rgb(244, 225, 203),
+    line: Color32::from_rgb(226, 195, 160),
+    line_soft: Color32::from_rgb(238, 215, 190),
+    text: Color32::from_rgb(60, 39, 23),
+    muted: Color32::from_rgb(135, 96, 63),
+    dim: Color32::from_rgb(175, 138, 104),
+    warning: Color32::from_rgb(154, 98, 0),
+    danger: Color32::from_rgb(178, 58, 45),
+    accent: Color32::from_rgb(185, 84, 28),
+};
+
+const VALENTINE: Palette = Palette {
+    dark: false,
+    glass: false,
+    bg: Color32::from_rgb(252, 239, 243),
+    panel: Color32::from_rgb(255, 248, 250),
+    input: Color32::from_rgb(249, 223, 232),
+    line: Color32::from_rgb(236, 192, 206),
+    line_soft: Color32::from_rgb(244, 215, 224),
+    text: Color32::from_rgb(66, 30, 43),
+    muted: Color32::from_rgb(148, 95, 112),
+    dim: Color32::from_rgb(190, 146, 161),
+    warning: Color32::from_rgb(164, 90, 0),
+    danger: Color32::from_rgb(188, 27, 59),
+    accent: Color32::from_rgb(217, 45, 92),
+};
+
+const GALAXY: Palette = Palette {
+    dark: true,
+    glass: false,
+    bg: Color32::from_rgb(8, 11, 30),
+    panel: Color32::from_rgb(17, 22, 46),
+    input: Color32::from_rgb(26, 33, 64),
+    line: Color32::from_rgb(42, 52, 92),
+    line_soft: Color32::from_rgb(29, 37, 71),
+    text: Color32::from_rgb(236, 239, 255),
+    muted: Color32::from_rgb(166, 175, 207),
+    dim: Color32::from_rgb(113, 123, 163),
+    warning: Color32::from_rgb(255, 196, 92),
+    danger: Color32::from_rgb(255, 107, 138),
+    accent: Color32::from_rgb(138, 124, 255),
+};
+
+const AURORA: Palette = Palette {
+    dark: true,
+    glass: false,
+    bg: Color32::from_rgb(6, 15, 21),
+    panel: Color32::from_rgb(13, 27, 35),
+    input: Color32::from_rgb(19, 40, 51),
+    line: Color32::from_rgb(33, 64, 78),
+    line_soft: Color32::from_rgb(24, 50, 61),
+    text: Color32::from_rgb(230, 247, 245),
+    muted: Color32::from_rgb(147, 183, 181),
+    dim: Color32::from_rgb(95, 133, 133),
+    warning: Color32::from_rgb(255, 209, 102),
+    danger: Color32::from_rgb(255, 107, 122),
+    accent: Color32::from_rgb(36, 201, 157),
+};
+
 const SANS_REGULAR: &str = "plex-sans-regular";
 const SANS_MEDIUM: &str = "plex-sans-medium";
 const SANS_SEMIBOLD: &str = "plex-sans-semibold";
@@ -468,6 +566,12 @@ fn palette() -> Palette {
         Theme::Winter => WINTER,
         Theme::Neon => NEON,
         Theme::TerminalGreen => TERMINAL_GREEN,
+        Theme::Spring => SPRING,
+        Theme::Summer => SUMMER,
+        Theme::Autumn => AUTUMN,
+        Theme::Valentine => VALENTINE,
+        Theme::Galaxy => GALAXY,
+        Theme::Aurora => AURORA,
     }
 }
 
@@ -525,7 +629,17 @@ fn current_theme() -> Theme {
 fn decorated() -> bool {
     matches!(
         current_theme(),
-        Theme::LiquidGlass | Theme::Halloween | Theme::Winter | Theme::Neon | Theme::TerminalGreen
+        Theme::LiquidGlass
+            | Theme::Halloween
+            | Theme::Winter
+            | Theme::Neon
+            | Theme::TerminalGreen
+            | Theme::Spring
+            | Theme::Summer
+            | Theme::Autumn
+            | Theme::Valentine
+            | Theme::Galaxy
+            | Theme::Aurora
     )
 }
 
@@ -744,6 +858,12 @@ pub fn paint_backdrop(ui: &egui::Ui) {
         Theme::Winter => winter_backdrop(painter, rect),
         Theme::Neon => neon_backdrop(painter, rect),
         Theme::TerminalGreen => terminal_backdrop(painter, rect),
+        Theme::Spring => spring_backdrop(painter, rect),
+        Theme::Summer => summer_backdrop(painter, rect),
+        Theme::Autumn => autumn_backdrop(painter, rect),
+        Theme::Valentine => valentine_backdrop(painter, rect),
+        Theme::Galaxy => galaxy_backdrop(painter, rect),
+        Theme::Aurora => aurora_backdrop(painter, rect),
         _ => {}
     }
 }
@@ -977,6 +1097,536 @@ fn terminal_backdrop(painter: &egui::Painter, rect: egui::Rect) {
         );
         y += 3.0;
     }
+}
+
+fn spring_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    quad_gradient(
+        painter,
+        rect,
+        Color32::from_rgb(226, 242, 255),
+        Color32::from_rgb(255, 228, 243),
+        Color32::from_rgb(255, 238, 245),
+        Color32::from_rgb(222, 248, 237),
+    );
+
+    let extent = rect.width().max(rect.height());
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.18,
+            rect.top() + rect.height() * 0.13,
+        ),
+        extent * 0.26,
+        alpha(Color32::from_rgb(255, 226, 152), 72),
+    );
+    // Soft hills made from very large blobs whose centers sit below the pane.
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.18,
+            rect.bottom() + rect.height() * 0.34,
+        ),
+        extent * 0.64,
+        alpha(Color32::from_rgb(128, 208, 166), 30),
+    );
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.90,
+            rect.bottom() + rect.height() * 0.38,
+        ),
+        extent * 0.56,
+        alpha(Color32::from_rgb(255, 154, 196), 26),
+    );
+
+    for index in 0..30 {
+        let x = ((index * 37 + 13) % 101) as f32 / 100.0;
+        let y = ((index * 53 + 7) % 97) as f32 / 96.0;
+        let size = 2.4 + ((index * 7) % 5) as f32 * 0.75;
+        let angle = ((index * 29) % 360) as f32 * std::f32::consts::PI / 180.0;
+        let color = if index % 3 == 0 {
+            alpha(Color32::WHITE, 140)
+        } else {
+            alpha(Color32::from_rgb(238, 112, 164), 118)
+        };
+        petal(
+            painter,
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            size,
+            angle,
+            color,
+        );
+    }
+
+    for index in 0..16 {
+        let x = ((index * 61 + 17) % 101) as f32 / 100.0;
+        let y = ((index * 41 + 23) % 97) as f32 / 96.0;
+        painter.circle_filled(
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            1.0 + ((index * 3) % 3) as f32 * 0.5,
+            alpha(Color32::WHITE, 120),
+        );
+    }
+}
+
+fn summer_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    let horizon = rect.top() + rect.height() * 0.66;
+    vertical_gradient(
+        painter,
+        egui::Rect::from_min_max(rect.min, egui::pos2(rect.right(), horizon)),
+        Color32::from_rgb(170, 222, 247),
+        Color32::from_rgb(235, 250, 255),
+    );
+    vertical_gradient(
+        painter,
+        egui::Rect::from_min_max(egui::pos2(rect.left(), horizon), rect.max),
+        Color32::from_rgb(86, 196, 220),
+        Color32::from_rgb(22, 126, 166),
+    );
+
+    let extent = rect.width().max(rect.height());
+    let sun = egui::pos2(
+        rect.left() + rect.width() * 0.72,
+        rect.top() + rect.height() * 0.05,
+    );
+    blob(
+        painter,
+        sun,
+        extent * 0.16,
+        alpha(Color32::from_rgb(255, 224, 128), 96),
+    );
+    painter.circle_filled(sun, extent * 0.038, Color32::from_rgb(255, 239, 176));
+
+    painter.line_segment(
+        [
+            egui::pos2(rect.left(), horizon),
+            egui::pos2(rect.right(), horizon),
+        ],
+        Stroke::new(1.0_f32, alpha(Color32::WHITE, 78)),
+    );
+
+    for index in 0..7 {
+        let y = horizon + rect.height() * (0.04 + index as f32 * 0.045);
+        let x = rect.left() + rect.width() * (((index * 29 + 9) % 71) as f32 / 100.0);
+        let length = rect.width() * (0.14 + ((index * 13) % 9) as f32 * 0.03);
+        painter.line_segment(
+            [egui::pos2(x, y), egui::pos2(x + length, y)],
+            Stroke::new(1.2_f32, alpha(Color32::WHITE, 52)),
+        );
+    }
+
+    for (x, y, size) in [(0.16, 0.14, 4.0), (0.27, 0.09, 3.0), (0.38, 0.20, 2.5)] {
+        bird(
+            painter,
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            size,
+            alpha(Color32::from_rgb(32, 84, 102), 90),
+        );
+    }
+}
+
+fn autumn_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    quad_gradient(
+        painter,
+        rect,
+        Color32::from_rgb(255, 236, 200),
+        Color32::from_rgb(255, 214, 166),
+        Color32::from_rgb(241, 196, 160),
+        Color32::from_rgb(252, 225, 194),
+    );
+
+    let extent = rect.width().max(rect.height());
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.82,
+            rect.top() + rect.height() * 0.76,
+        ),
+        extent * 0.30,
+        alpha(Color32::from_rgb(255, 166, 72), 58),
+    );
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.14,
+            rect.bottom() + rect.height() * 0.30,
+        ),
+        extent * 0.58,
+        alpha(Color32::from_rgb(150, 142, 74), 24),
+    );
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.88,
+            rect.bottom() + rect.height() * 0.32,
+        ),
+        extent * 0.54,
+        alpha(Color32::from_rgb(170, 88, 44), 24),
+    );
+
+    let palette = [
+        Color32::from_rgb(190, 82, 36),
+        Color32::from_rgb(214, 124, 42),
+        Color32::from_rgb(160, 68, 34),
+        Color32::from_rgb(226, 158, 56),
+    ];
+    for index in 0..28 {
+        let x = ((index * 43 + 11) % 101) as f32 / 100.0;
+        let y = ((index * 59 + 3) % 97) as f32 / 96.0;
+        let size = 2.8 + ((index * 11) % 6) as f32 * 0.85;
+        let angle = ((index * 47) % 360) as f32 * std::f32::consts::PI / 180.0;
+        let color = palette[index % palette.len()];
+        leaf(
+            painter,
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            size,
+            angle,
+            alpha(color, 132),
+            alpha(Color32::from_rgb(110, 52, 24), 72),
+        );
+    }
+}
+
+fn valentine_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    vertical_gradient(
+        painter,
+        rect,
+        Color32::from_rgb(255, 226, 236),
+        Color32::from_rgb(255, 247, 250),
+    );
+
+    let extent = rect.width().max(rect.height());
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.12,
+            rect.top() + rect.height() * 0.16,
+        ),
+        extent * 0.44,
+        alpha(Color32::from_rgb(255, 150, 184), 48),
+    );
+    blob(
+        painter,
+        egui::pos2(
+            rect.left() + rect.width() * 0.88,
+            rect.top() + rect.height() * 0.84,
+        ),
+        extent * 0.42,
+        alpha(Color32::from_rgb(230, 80, 128), 32),
+    );
+
+    for index in 0..14 {
+        let x = ((index * 53 + 7) % 101) as f32 / 100.0;
+        let y = ((index * 31 + 19) % 97) as f32 / 96.0;
+        let radius = 6.0 + ((index * 9) % 15) as f32;
+        painter.circle_filled(
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            radius,
+            alpha(Color32::WHITE, 24),
+        );
+    }
+
+    let palette = [
+        Color32::from_rgb(218, 48, 90),
+        Color32::from_rgb(240, 106, 138),
+        Color32::from_rgb(255, 154, 178),
+    ];
+    for index in 0..16 {
+        let x = ((index * 41 + 13) % 101) as f32 / 100.0;
+        let y = ((index * 67 + 5) % 97) as f32 / 96.0;
+        let size = 3.0 + ((index * 7) % 5) as f32 * 1.1;
+        heart(
+            painter,
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            size,
+            alpha(palette[index % palette.len()], 130),
+        );
+    }
+}
+
+fn galaxy_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    vertical_gradient(
+        painter,
+        rect,
+        Color32::from_rgb(4, 6, 22),
+        Color32::from_rgb(13, 18, 46),
+    );
+
+    let extent = rect.width().max(rect.height());
+    for (x, y, radius, color) in [
+        (0.18, 0.30, 0.56, Color32::from_rgb(92, 64, 220)),
+        (0.82, 0.72, 0.48, Color32::from_rgb(30, 120, 220)),
+        (0.68, 0.16, 0.38, Color32::from_rgb(180, 60, 180)),
+        (0.38, 0.58, 0.30, Color32::from_rgb(70, 170, 230)),
+    ] {
+        blob(
+            painter,
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            extent * radius,
+            alpha(color, 34),
+        );
+    }
+
+    for index in 0..72 {
+        let x = ((index * 37 + 5) % 101) as f32 / 100.0;
+        let y = ((index * 61 + 23) % 97) as f32 / 96.0;
+        let radius = 0.6 + ((index * 7) % 5) as f32 * 0.35;
+        let color = alpha(Color32::WHITE, 130 + ((index * 17) % 90) as u8);
+        painter.circle_filled(
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            radius,
+            color,
+        );
+    }
+
+    for (x, y, size) in [(0.30, 0.18, 4.5), (0.72, 0.44, 3.5), (0.14, 0.64, 3.0)] {
+        sparkle(
+            painter,
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            size,
+            alpha(Color32::WHITE, 170),
+        );
+    }
+
+    let planet = egui::pos2(
+        rect.left() + rect.width() * 0.64,
+        rect.top() + rect.height() * 0.055,
+    );
+    let planet_radius = extent * 0.028;
+    let ring: Vec<egui::Pos2> = (0..=40)
+        .map(|index| {
+            let angle = index as f32 / 40.0 * std::f32::consts::TAU;
+            planet
+                + egui::vec2(
+                    angle.cos() * planet_radius * 1.95,
+                    angle.sin() * planet_radius * 0.55,
+                )
+        })
+        .collect();
+    painter.add(egui::Shape::line(
+        ring,
+        Stroke::new(1.3_f32, alpha(Color32::from_rgb(205, 196, 255), 150)),
+    ));
+    painter.circle_filled(
+        planet,
+        planet_radius,
+        alpha(Color32::from_rgb(164, 154, 216), 230),
+    );
+    painter.circle_filled(
+        planet + egui::vec2(planet_radius * 0.35, planet_radius * 0.25),
+        planet_radius * 0.72,
+        alpha(Color32::from_rgb(114, 104, 172), 210),
+    );
+}
+
+fn aurora_backdrop(painter: &egui::Painter, rect: egui::Rect) {
+    vertical_gradient(
+        painter,
+        rect,
+        Color32::from_rgb(3, 9, 15),
+        Color32::from_rgb(9, 22, 30),
+    );
+
+    for index in 0..64 {
+        let x = ((index * 37 + 11) % 101) as f32 / 100.0;
+        let y = ((index * 47 + 7) % 91) as f32 / 90.0;
+        painter.circle_filled(
+            egui::pos2(
+                rect.left() + rect.width() * x,
+                rect.top() + rect.height() * y,
+            ),
+            0.6 + ((index * 5) % 4) as f32 * 0.35,
+            alpha(Color32::WHITE, 90 + ((index * 19) % 110) as u8),
+        );
+    }
+
+    aurora_ribbon(
+        painter,
+        rect,
+        0.20,
+        0.055,
+        0.4,
+        28.0,
+        Color32::from_rgb(70, 226, 164),
+    );
+    aurora_ribbon(
+        painter,
+        rect,
+        0.33,
+        0.050,
+        2.1,
+        20.0,
+        Color32::from_rgb(58, 190, 220),
+    );
+    aurora_ribbon(
+        painter,
+        rect,
+        0.45,
+        0.042,
+        4.2,
+        16.0,
+        Color32::from_rgb(148, 122, 230),
+    );
+
+    // A dark horizon anchors the sky and keeps the bottom text readable.
+    vertical_gradient(
+        painter,
+        egui::Rect::from_min_max(
+            egui::pos2(rect.left(), rect.bottom() - rect.height() * 0.22),
+            rect.max,
+        ),
+        Color32::TRANSPARENT,
+        alpha(Color32::from_rgb(4, 10, 14), 190),
+    );
+}
+
+fn petal(painter: &egui::Painter, center: egui::Pos2, size: f32, angle: f32, color: Color32) {
+    let direction = egui::vec2(angle.cos(), angle.sin());
+    let side = egui::vec2(-direction.y, direction.x);
+    painter.add(egui::Shape::convex_polygon(
+        vec![
+            center + direction * size,
+            center + side * size * 0.48 - direction * size * 0.15,
+            center - direction * size * 0.85,
+            center - side * size * 0.48 - direction * size * 0.15,
+        ],
+        color,
+        Stroke::NONE,
+    ));
+}
+
+fn leaf(
+    painter: &egui::Painter,
+    center: egui::Pos2,
+    size: f32,
+    angle: f32,
+    fill: Color32,
+    vein: Color32,
+) {
+    petal(painter, center, size, angle, fill);
+    let direction = egui::vec2(angle.cos(), angle.sin());
+    painter.line_segment(
+        [
+            center - direction * size * 0.45,
+            center + direction * size * 0.62,
+        ],
+        Stroke::new(0.8_f32, vein),
+    );
+}
+
+fn heart(painter: &egui::Painter, center: egui::Pos2, size: f32, color: Color32) {
+    let lobe = size * 0.34;
+    painter.circle_filled(center + egui::vec2(-size * 0.30, -size * 0.16), lobe, color);
+    painter.circle_filled(center + egui::vec2(size * 0.30, -size * 0.16), lobe, color);
+    painter.add(egui::Shape::convex_polygon(
+        vec![
+            center + egui::vec2(-size * 0.64, -size * 0.12),
+            center + egui::vec2(size * 0.64, -size * 0.12),
+            center + egui::vec2(0.0, size * 0.78),
+        ],
+        color,
+        Stroke::NONE,
+    ));
+}
+
+fn sparkle(painter: &egui::Painter, center: egui::Pos2, size: f32, color: Color32) {
+    painter.circle_filled(center, size * 0.32, color);
+    let stroke = Stroke::new(0.8_f32, color);
+    painter.line_segment(
+        [
+            center - egui::vec2(size, 0.0),
+            center + egui::vec2(size, 0.0),
+        ],
+        stroke,
+    );
+    painter.line_segment(
+        [
+            center - egui::vec2(0.0, size),
+            center + egui::vec2(0.0, size),
+        ],
+        stroke,
+    );
+}
+
+fn bird(painter: &egui::Painter, center: egui::Pos2, size: f32, color: Color32) {
+    let stroke = Stroke::new(1.2_f32, color);
+    painter.line_segment(
+        [
+            center + egui::vec2(-size, 0.0),
+            center + egui::vec2(0.0, -size * 0.35),
+        ],
+        stroke,
+    );
+    painter.line_segment(
+        [
+            center + egui::vec2(0.0, -size * 0.35),
+            center + egui::vec2(size, 0.0),
+        ],
+        stroke,
+    );
+}
+
+fn aurora_ribbon(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    base_y: f32,
+    amplitude: f32,
+    phase: f32,
+    width: f32,
+    color: Color32,
+) {
+    let points: Vec<egui::Pos2> = (0..=40)
+        .map(|index| {
+            let t = index as f32 / 40.0;
+            let y = base_y
+                + amplitude * (t * std::f32::consts::TAU * 1.7 + phase).sin()
+                + amplitude * 0.35 * (t * std::f32::consts::TAU * 3.3 + phase * 1.7).sin();
+            egui::pos2(
+                rect.left() + rect.width() * t,
+                rect.top() + rect.height() * y,
+            )
+        })
+        .collect();
+
+    painter.add(egui::Shape::line(
+        points.clone(),
+        Stroke::new(width, alpha(color, 12)),
+    ));
+    painter.add(egui::Shape::line(
+        points.clone(),
+        Stroke::new(width * 0.55, alpha(color, 20)),
+    ));
+    painter.add(egui::Shape::line(
+        points,
+        Stroke::new(width * 0.20, alpha(color, 30)),
+    ));
 }
 
 fn quad_gradient(
