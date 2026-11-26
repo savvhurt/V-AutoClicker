@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -8,6 +9,7 @@ use egui::{self, Align, Color32, CornerRadius, Frame, Layout, Margin, RichText, 
 use egui_software_backend::{SoftwareBackend, SoftwareBackendAppConfiguration};
 
 use super::config::{self, Theme};
+use super::profiles::{self, ActiveProfile, Preset, Profile};
 use super::worker::{Command, Event, Worker};
 use super::{theme, widgets};
 
@@ -15,6 +17,7 @@ use crate::i18n::{self, Key, Lang, Language};
 use crate::state::{
     Button, ClickMode, MAX_DELAY_MS, MAX_LIMIT, MAX_POINT_INTERVAL_MS, MAX_POINTS,
     MAX_RANDOM_INTERVAL_MS, MIN_RANDOM_INTERVAL_MS, Point, Settings, Status, StopReason,
+    format_decimal,
 };
 use crate::update::{self, Release};
 
@@ -103,6 +106,12 @@ struct Confirmation<'a> {
     text: Key,
     confirm: Key,
     solid: bool,
+}
+
+enum ProfileDialog {
+    SaveAs { name: String },
+    Export { path: String },
+    Import { path: String },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -231,6 +240,10 @@ pub struct GuiApp {
     #[cfg(windows)]
     tray: Option<super::tray::Tray>,
     pipette: Option<Pipette>,
+    profiles: Vec<Profile>,
+    active_profile: ActiveProfile,
+    profile_dialog: Option<ProfileDialog>,
+    confirm_profile_delete: bool,
     confirm_defaults: bool,
     autostart_enabled: bool,
     online: bool,
@@ -271,6 +284,7 @@ pub struct GuiApp {
     events: Receiver<Event>,
     worker: Option<thread::JoinHandle<()>>,
     worker_stop: Arc<AtomicBool>,
+    saver: config::Saver,
 }
 
 impl GuiApp {
@@ -323,6 +337,10 @@ impl GuiApp {
             #[cfg(windows)]
             tray: None,
             pipette: None,
+            profiles: config.profiles,
+            active_profile: config.active_profile,
+            profile_dialog: None,
+            confirm_profile_delete: false,
             confirm_defaults: false,
             autostart_enabled,
             online: false,
@@ -360,6 +378,7 @@ impl GuiApp {
             events: worker.events,
             worker: worker.handle,
             worker_stop,
+            saver: config::Saver::new(),
         };
 
         #[cfg(windows)]
@@ -996,11 +1015,11 @@ impl GuiApp {
         if status.enabled || status.starting {
             self.start_guard = None;
         }
-        self.daemon_error = status.last_error.clone();
-        self.daemon_hotkey_active = status.hotkey_active.clone();
-        self.daemon_hold_hotkey_active = status.hold_hotkey_active.clone();
+        self.daemon_error = status.last_error;
+        self.daemon_hotkey_active = status.hotkey_active;
+        self.daemon_hold_hotkey_active = status.hold_hotkey_active;
         self.daemon_hotkey_paused = status.hotkey_paused;
-        self.daemon_hotkey_error = status.hotkey_error.clone();
+        self.daemon_hotkey_error = status.hotkey_error;
         self.daemon_settings = Some(status.settings);
         self.daemon_protocol = status.protocol;
 
@@ -1058,7 +1077,7 @@ impl GuiApp {
                     self.settings = status.settings.into();
                 }
             } else if let Ok(current) = self.settings.to_settings() {
-                if !settings_equivalent(&current, &status.settings) {
+                if !current.equivalent(&status.settings) {
                     let _ = self.commands.send(Command::Apply(current));
                     self.last_apply_sent = Some(Instant::now());
                 }
@@ -1072,7 +1091,7 @@ impl GuiApp {
         }
 
         if let Ok(current) = self.settings.to_settings() {
-            if settings_equivalent(&current, &status.settings) {
+            if current.equivalent(&status.settings) {
                 self.last_apply_sent = None;
                 if self.draft_changed_at.take().is_some() {
                     self.save_config();
@@ -1113,7 +1132,7 @@ impl GuiApp {
         if self.online {
             let already_current = self
                 .daemon_settings
-                .is_some_and(|current| settings_equivalent(&current, &settings));
+                .is_some_and(|current| current.equivalent(&settings));
             if !already_current {
                 let _ = self.commands.send(Command::Apply(settings));
                 self.last_apply_sent = Some(Instant::now());
@@ -1137,15 +1156,22 @@ impl GuiApp {
                 always_on_top: self.always_on_top,
                 minimize_to_tray: self.minimize_to_tray,
                 check_updates: self.check_updates,
+                profiles: self.profiles.clone(),
+                active_profile: self.active_profile.clone(),
             })
     }
 
     fn save_config(&mut self) {
+        self.poll_save_errors();
         let Some(config) = self.config_snapshot() else {
             return;
         };
-        if let Err(error) = config::save(&config) {
-            self.notice = Some(self.fill(Key::SaveFailed, &[format!("{error:#}")]));
+        self.saver.save(config);
+    }
+
+    fn poll_save_errors(&mut self) {
+        if let Some(error) = self.saver.take_error() {
+            self.notice = Some(self.fill(Key::SaveFailed, &[error]));
         }
     }
 
@@ -1165,37 +1191,7 @@ impl GuiApp {
     }
 
     fn theme_label(&self, theme: Theme) -> &'static str {
-        self.t(match theme {
-            Theme::Paper => Key::ThemePaper,
-            Theme::Graphite => Key::ThemeGraphite,
-            Theme::Sand => Key::ThemeSand,
-            Theme::Ocean => Key::ThemeOcean,
-            Theme::Forest => Key::ThemeForest,
-            Theme::Contrast => Key::ThemeContrast,
-            Theme::Rose => Key::ThemeRose,
-            Theme::Lavender => Key::ThemeLavender,
-            Theme::Midnight => Key::ThemeMidnight,
-            Theme::Nord => Key::ThemeNord,
-            Theme::Coffee => Key::ThemeCoffee,
-            Theme::Matcha => Key::ThemeMatcha,
-            Theme::Glacier => Key::ThemeGlacier,
-            Theme::Apricot => Key::ThemeApricot,
-            Theme::Mint => Key::ThemeMint,
-            Theme::Ember => Key::ThemeEmber,
-            Theme::Plum => Key::ThemePlum,
-            Theme::Wine => Key::ThemeWine,
-            Theme::LiquidGlass => Key::ThemeLiquidGlass,
-            Theme::Halloween => Key::ThemeHalloween,
-            Theme::Winter => Key::ThemeWinter,
-            Theme::Neon => Key::ThemeNeon,
-            Theme::TerminalGreen => Key::ThemeTerminalGreen,
-            Theme::Spring => Key::ThemeSpring,
-            Theme::Summer => Key::ThemeSummer,
-            Theme::Autumn => Key::ThemeAutumn,
-            Theme::Valentine => Key::ThemeValentine,
-            Theme::Galaxy => Key::ThemeGalaxy,
-            Theme::Aurora => Key::ThemeAurora,
-        })
+        self.t(theme.label_key())
     }
 
     fn set_language(&mut self, language: Language) {
@@ -1840,44 +1836,57 @@ impl GuiApp {
         ui.add_space(1.0);
     }
 
-    fn notice_data(&self) -> (Color32, &'static str, String) {
+    fn notice_data(&self) -> (Color32, &'static str, Cow<'_, str>) {
         if let Some(error) = &self.daemon_error {
-            return (theme::danger(), self.t(Key::NoticeError), error.clone());
+            return (
+                theme::danger(),
+                self.t(Key::NoticeError),
+                Cow::Borrowed(error),
+            );
         }
         if let Some(notice) = &self.notice {
-            return (theme::warning(), self.t(Key::NoticeSystem), notice.clone());
+            return (
+                theme::warning(),
+                self.t(Key::NoticeSystem),
+                Cow::Borrowed(notice),
+            );
         }
         if let Some(error) = &self.daemon_hotkey_error {
-            return (theme::danger(), self.t(Key::NoticeHotkey), error.clone());
+            return (
+                theme::danger(),
+                self.t(Key::NoticeHotkey),
+                Cow::Borrowed(error),
+            );
         }
         if self.starting {
             return (
                 theme::warning(),
                 self.t(Key::NoticeStart),
-                self.fill(
+                Cow::Owned(self.fill(
                     Key::NoticeStartsIn,
                     &[format!("{:.1}", self.delay_left_ms as f64 / 1000.0)],
-                ),
+                )),
             );
         }
         if self.stop_reason == Some(StopReason::Limit) && !self.enabled {
             return (
                 theme::warning(),
                 self.t(Key::NoticeLimit),
-                self.fill(Key::NoticeLimitDone, &[group_digits(self.session_clicks)]),
+                Cow::Owned(self.fill(Key::NoticeLimitDone, &[group_digits(self.session_clicks)])),
             );
         }
         if !self.online {
             let detail = self
                 .offline_reason
-                .clone()
-                .unwrap_or_else(|| self.t(Key::NoticeDaemonDown).to_string());
+                .as_deref()
+                .map(Cow::Borrowed)
+                .unwrap_or_else(|| Cow::Borrowed(self.t(Key::NoticeDaemonDown)));
             return (theme::dim(), self.t(Key::NoticeDaemon), detail);
         }
         (
             theme::dim(),
             self.t(Key::NoticeReady),
-            self.t(Key::NoticeAutoApply).to_string(),
+            Cow::Borrowed(self.t(Key::NoticeAutoApply)),
         )
     }
 
@@ -2064,7 +2073,7 @@ impl GuiApp {
         {
             Some((
                 theme::warning(),
-                self.fill(Key::HintHoldClamped, &[trim_number(effective_hold)]),
+                self.fill(Key::HintHoldClamped, &[format_decimal(effective_hold, 2)]),
             ))
         } else if draft.limit > 0 {
             Some((
@@ -2368,12 +2377,570 @@ impl GuiApp {
         }
     }
 
+    fn profile_label(&self, active: &ActiveProfile) -> String {
+        match active {
+            ActiveProfile::Preset(preset) => self.t(preset.label_key()).to_string(),
+            ActiveProfile::User(name) => name.clone(),
+        }
+    }
+
+    fn active_profile_settings(&self) -> Option<Settings> {
+        match &self.active_profile {
+            ActiveProfile::Preset(preset) => Some(preset.settings()),
+            ActiveProfile::User(name) => self
+                .profiles
+                .iter()
+                .find(|profile| profile.name.eq_ignore_ascii_case(name))
+                .map(|profile| profile.settings),
+        }
+    }
+
+    fn profile_modified(&self) -> bool {
+        let Ok(current) = self.settings.to_settings() else {
+            return true;
+        };
+        match self.active_profile_settings() {
+            Some(saved) => !current.equivalent(&saved),
+            None => true,
+        }
+    }
+
+    fn button_label(&self, button: Button) -> &'static str {
+        self.t(match button {
+            Button::Left => Key::ButtonLeft,
+            Button::Right => Key::ButtonRight,
+            Button::Middle => Key::ButtonMiddle,
+        })
+    }
+
+    fn profile_summary(&self) -> Option<String> {
+        let settings = self.settings.to_settings().ok()?;
+        Some(format!(
+            "{} CPS · {} · {} ms",
+            format_decimal(settings.cps, 2),
+            self.button_label(settings.button),
+            format_decimal(settings.hold_ms(), 2)
+        ))
+    }
+
+    fn select_profile(&mut self, active: ActiveProfile) {
+        let settings = match &active {
+            ActiveProfile::Preset(preset) => preset.settings(),
+            ActiveProfile::User(name) => {
+                let Some(profile) = self
+                    .profiles
+                    .iter()
+                    .find(|profile| profile.name.eq_ignore_ascii_case(name))
+                else {
+                    return;
+                };
+                profile.settings
+            }
+        };
+
+        self.settings = settings.into();
+        self.active_profile = active;
+        self.mark_dirty();
+        let label = self.profile_label(&self.active_profile);
+        self.notice = Some(self.fill(Key::ProfileApplied, &[label]));
+    }
+
+    fn save_current_profile(&mut self) {
+        let ActiveProfile::User(name) = self.active_profile.clone() else {
+            self.open_save_as();
+            return;
+        };
+        let Ok(settings) = self.settings.to_settings() else {
+            return;
+        };
+        if let Some(profile) = self
+            .profiles
+            .iter_mut()
+            .find(|profile| profile.name.eq_ignore_ascii_case(&name))
+        {
+            profile.settings = settings;
+        }
+        self.notice = Some(self.t(Key::ProfileSaved).to_string());
+        self.save_config();
+    }
+
+    fn unique_profile_name(&self, base: &str) -> String {
+        let name = profiles::unique_name(base, &self.profiles);
+        let reserved = Preset::ALL.iter().any(|preset| {
+            self.t(preset.label_key()).eq_ignore_ascii_case(&name)
+                || preset.id().eq_ignore_ascii_case(&name)
+        });
+        if reserved {
+            profiles::unique_name(&format!("{name} (2)"), &self.profiles)
+        } else {
+            name
+        }
+    }
+
+    fn open_save_as(&mut self) {
+        let name = match &self.active_profile {
+            ActiveProfile::Preset(preset) => self.t(preset.label_key()).to_string(),
+            ActiveProfile::User(name) => name.clone(),
+        };
+        self.profile_dialog = Some(ProfileDialog::SaveAs { name });
+    }
+
+    fn open_export(&mut self) {
+        let name = self.profile_label(&self.active_profile);
+        let path = profiles::default_export_path(&name);
+        self.profile_dialog = Some(ProfileDialog::Export {
+            path: path.to_string_lossy().into_owned(),
+        });
+    }
+
+    fn commit_save_as(&mut self, name: &str) -> bool {
+        let name = name.trim();
+        if name.is_empty() {
+            self.notice = Some(self.t(Key::ProfileNameEmpty).to_string());
+            return false;
+        }
+        if name.chars().count() > profiles::MAX_PROFILE_NAME_CHARS {
+            self.notice = Some(self.t(Key::ProfileNameTooLong).to_string());
+            return false;
+        }
+        let Ok(settings) = self.settings.to_settings() else {
+            return false;
+        };
+
+        let name = self.unique_profile_name(name);
+        self.profiles.push(Profile::new(name.clone(), settings));
+        self.active_profile = ActiveProfile::User(name.clone());
+        self.notice = Some(self.fill(Key::ProfileSavedAs, &[name]));
+        self.save_config();
+        true
+    }
+
+    fn commit_export(&mut self, path: &str) -> bool {
+        let name = self.profile_label(&self.active_profile);
+        let result = profiles::resolve_text_path(path, &name).and_then(|path| {
+            let Ok(settings) = self.settings.to_settings() else {
+                anyhow::bail!("the click settings are invalid");
+            };
+            profiles::export_file(&path, &name, &settings)
+        });
+
+        match result {
+            Ok(path) => {
+                self.notice =
+                    Some(self.fill(Key::ProfileExported, &[path.to_string_lossy().into_owned()]));
+                true
+            }
+            Err(error) => {
+                self.notice = Some(self.fill(Key::ProfileExportFailed, &[format!("{error:#}")]));
+                false
+            }
+        }
+    }
+
+    fn commit_import(&mut self, path: &str) -> bool {
+        let result = profiles::resolve_text_path(path, "profile")
+            .and_then(|path| profiles::import_file(&path));
+
+        match result {
+            Ok(profile) => {
+                let name = self.unique_profile_name(&profile.name);
+                let settings = profile.settings;
+                self.profiles.push(Profile::new(name.clone(), settings));
+                self.settings = settings.into();
+                self.active_profile = ActiveProfile::User(name.clone());
+                self.mark_dirty();
+                self.notice = Some(self.fill(Key::ProfileImported, &[name]));
+                self.save_config();
+                true
+            }
+            Err(error) => {
+                self.notice = Some(self.fill(Key::ProfileImportFailed, &[format!("{error:#}")]));
+                false
+            }
+        }
+    }
+
+    fn draw_profile_section(&mut self, ui: &mut Ui) {
+        let entries: Vec<(ActiveProfile, String)> = Preset::ALL
+            .iter()
+            .map(|preset| ActiveProfile::Preset(*preset))
+            .chain(
+                self.profiles
+                    .iter()
+                    .map(|profile| ActiveProfile::User(profile.name.clone())),
+            )
+            .map(|active| {
+                let label = self.profile_label(&active);
+                (active, label)
+            })
+            .collect();
+
+        let mut selected = self.active_profile.clone();
+        let selected_text = self.profile_label(&selected);
+        let width = ui.available_width().min(210.0);
+        let _ = compact_choice_row(
+            ui,
+            self.t(Key::RowProfile),
+            self.t(Key::HintProfile),
+            |ui| {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    egui::ComboBox::from_id_salt("profile")
+                        .width(width)
+                        .selected_text(selected_text)
+                        .show_ui(ui, |ui| {
+                            for (active, label) in &entries {
+                                ui.selectable_value(&mut selected, active.clone(), label);
+                            }
+                        });
+                });
+                false
+            },
+        );
+        if selected != self.active_profile {
+            self.select_profile(selected);
+        }
+
+        if let Some(summary) = self.profile_summary() {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(summary)
+                            .font(theme::sans(10.5))
+                            .color(theme::muted()),
+                    )
+                    .truncate(),
+                );
+                if self.profile_modified() {
+                    ui.label(
+                        RichText::new(self.t(Key::ProfileModified))
+                            .font(theme::mono_medium(8.0))
+                            .color(theme::warning()),
+                    );
+                }
+            });
+        }
+
+        let is_user = matches!(self.active_profile, ActiveProfile::User(_));
+        let mut save = false;
+        let mut save_as = false;
+        let mut export = false;
+        let mut import = false;
+        let mut delete = false;
+
+        ui.add_space(2.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            if widgets::text_button(
+                ui,
+                self.t(Key::ProfileSave),
+                theme::muted(),
+                theme::accent(),
+            )
+            .clicked()
+            {
+                save = true;
+            }
+            if widgets::text_button(
+                ui,
+                self.t(Key::ProfileSaveAs),
+                theme::muted(),
+                theme::accent(),
+            )
+            .clicked()
+            {
+                save_as = true;
+            }
+            if widgets::text_button(
+                ui,
+                self.t(Key::ProfileExport),
+                theme::muted(),
+                theme::accent(),
+            )
+            .clicked()
+            {
+                export = true;
+            }
+            if widgets::text_button(
+                ui,
+                self.t(Key::ProfileImport),
+                theme::muted(),
+                theme::accent(),
+            )
+            .clicked()
+            {
+                import = true;
+            }
+            ui.add_enabled_ui(is_user, |ui| {
+                if widgets::text_button(
+                    ui,
+                    self.t(Key::ProfileDelete),
+                    theme::muted(),
+                    theme::danger(),
+                )
+                .clicked()
+                {
+                    delete = true;
+                }
+            });
+        });
+
+        if save {
+            self.save_current_profile();
+        }
+        if save_as {
+            self.open_save_as();
+        }
+        if export {
+            self.open_export();
+        }
+        if import {
+            self.profile_dialog = Some(ProfileDialog::Import {
+                path: String::new(),
+            });
+        }
+        if delete {
+            self.confirm_profile_delete = true;
+        }
+    }
+
+    fn draw_profile_dialog(&mut self, ctx: &egui::Context) {
+        let Some(mut dialog) = self.profile_dialog.take() else {
+            return;
+        };
+
+        let (id, title, question, text, label, action, hint) = match &dialog {
+            ProfileDialog::SaveAs { .. } => (
+                "profile_save_as",
+                Key::ProfileSaveAsTitle,
+                Key::ProfileSaveAsQuestion,
+                Key::ProfileSaveAsText,
+                Key::ProfileNameLabel,
+                Key::ProfileDialogSave,
+                self.t(Key::ProfileNameHint),
+            ),
+            ProfileDialog::Export { .. } => (
+                "profile_export",
+                Key::ProfileExportTitle,
+                Key::ProfileExportQuestion,
+                Key::ProfileExportText,
+                Key::ProfilePathLabel,
+                Key::ProfileDialogSave,
+                self.t(Key::ProfilePathHint),
+            ),
+            ProfileDialog::Import { .. } => (
+                "profile_import",
+                Key::ProfileImportTitle,
+                Key::ProfileImportQuestion,
+                Key::ProfileImportText,
+                Key::ProfilePathLabel,
+                Key::ProfileDialogOpen,
+                self.t(Key::ProfilePathHint),
+            ),
+        };
+
+        let overwrite = match &dialog {
+            ProfileDialog::Export { path } => {
+                profiles::resolve_text_path(path, "profile").is_ok_and(|path| path.exists())
+            }
+            _ => false,
+        };
+
+        let mut confirmed = false;
+        let mut closed = false;
+        let modal = egui::Modal::new(egui::Id::new(id))
+            .backdrop_color(Color32::from_black_alpha(120))
+            .frame(theme::dialog())
+            .show(ctx, |ui| {
+                ui.set_width(380.0);
+                ui.label(
+                    RichText::new(self.t(title))
+                        .font(theme::mono_medium(9.0))
+                        .color(theme::dim()),
+                );
+                ui.add_space(6.0);
+                ui.label(
+                    RichText::new(self.t(question))
+                        .font(theme::sans_semibold(20.0))
+                        .color(theme::text()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(self.t(text))
+                            .font(theme::sans(11.5))
+                            .color(theme::muted()),
+                    )
+                    .wrap(),
+                );
+                ui.add_space(14.0);
+                ui.label(
+                    RichText::new(self.t(label))
+                        .font(theme::mono_medium(8.0))
+                        .color(theme::dim()),
+                );
+                ui.add_space(4.0);
+
+                let response = match &mut dialog {
+                    ProfileDialog::SaveAs { name }
+                    | ProfileDialog::Export { path: name }
+                    | ProfileDialog::Import { path: name } => widgets::text_field(ui, name, hint),
+                };
+
+                if overwrite {
+                    ui.add_space(6.0);
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(self.t(Key::ProfileOverwriteWarning))
+                                .font(theme::sans(10.0))
+                                .color(theme::warning()),
+                        )
+                        .wrap(),
+                    );
+                }
+
+                if response.has_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                    confirmed = true;
+                }
+
+                ui.add_space(18.0);
+                ui.horizontal(|ui| {
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if widgets::solid_button(
+                            ui,
+                            self.t(action),
+                            theme::accent(),
+                            theme::on_accent(),
+                        )
+                        .clicked()
+                        {
+                            confirmed = true;
+                        }
+                        if widgets::text_button(
+                            ui,
+                            self.t(Key::Cancel),
+                            theme::muted(),
+                            theme::text(),
+                        )
+                        .clicked()
+                        {
+                            closed = true;
+                        }
+                    });
+                });
+            });
+
+        theme::paint_dialog_edge(ctx, modal.response.layer_id, modal.response.rect);
+
+        if modal.should_close() {
+            closed = true;
+        }
+
+        let mut keep = !confirmed && !closed;
+        if confirmed {
+            keep = match &dialog {
+                ProfileDialog::SaveAs { name } => !self.commit_save_as(name),
+                ProfileDialog::Export { path } => !self.commit_export(path),
+                ProfileDialog::Import { path } => !self.commit_import(path),
+            };
+        }
+
+        if keep {
+            self.profile_dialog = Some(dialog);
+        }
+    }
+
+    fn draw_profile_delete(&mut self, ctx: &egui::Context) {
+        if !self.confirm_profile_delete {
+            return;
+        }
+        let ActiveProfile::User(name) = self.active_profile.clone() else {
+            self.confirm_profile_delete = false;
+            return;
+        };
+
+        let question = self.fill(Key::ProfileDeleteQuestion, std::slice::from_ref(&name));
+        let mut confirmed = false;
+        let mut closed = false;
+        let modal = egui::Modal::new(egui::Id::new("profile_delete"))
+            .backdrop_color(Color32::from_black_alpha(120))
+            .frame(theme::dialog())
+            .show(ctx, |ui| {
+                ui.set_width(360.0);
+                ui.label(
+                    RichText::new(self.t(Key::ProfileDeleteTitle))
+                        .font(theme::mono_medium(9.0))
+                        .color(theme::dim()),
+                );
+                ui.add_space(6.0);
+                ui.label(
+                    RichText::new(&question)
+                        .font(theme::sans_semibold(22.0))
+                        .color(theme::text()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(self.t(Key::ProfileDeleteText))
+                            .font(theme::sans(12.0))
+                            .color(theme::muted()),
+                    )
+                    .wrap(),
+                );
+                ui.add_space(20.0);
+                ui.horizontal(|ui| {
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if widgets::solid_button(
+                            ui,
+                            self.t(Key::ProfileDelete),
+                            theme::danger(),
+                            theme::panel(),
+                        )
+                        .clicked()
+                        {
+                            confirmed = true;
+                        }
+                        if widgets::text_button(
+                            ui,
+                            self.t(Key::Cancel),
+                            theme::muted(),
+                            theme::text(),
+                        )
+                        .clicked()
+                        {
+                            closed = true;
+                        }
+                    });
+                });
+            });
+
+        theme::paint_dialog_edge(ctx, modal.response.layer_id, modal.response.rect);
+
+        if modal.should_close() {
+            closed = true;
+        }
+
+        if confirmed {
+            self.profiles
+                .retain(|profile| !profile.name.eq_ignore_ascii_case(&name));
+            self.active_profile = ActiveProfile::Preset(Preset::Default);
+            self.notice = Some(self.fill(Key::ProfileDeleted, &[name]));
+            self.save_config();
+            self.confirm_profile_delete = false;
+        } else if closed {
+            self.confirm_profile_delete = false;
+        }
+    }
+
     fn draw_system_tab(&mut self, ui: &mut Ui) {
         ui.spacing_mut().item_spacing.y = if ui.ctx().content_rect().height() < 600.0 {
             1.0
         } else {
             3.0
         };
+
+        self.draw_profile_section(ui);
+        theme::rule(ui);
 
         let mut selected = self.language;
         let _ = compact_choice_row(
@@ -2949,6 +3516,7 @@ impl egui_software_backend::App for GuiApp {
             }
         }
         self.poll_pipette(ui.ctx());
+        self.poll_save_errors();
 
         self.capture_hotkey(ui.ctx());
         self.drain_events(ui.ctx());
@@ -3031,6 +3599,8 @@ impl egui_software_backend::App for GuiApp {
         self.draw_quit_confirmation(ui.ctx());
         self.draw_defaults_confirmation(ui.ctx());
         self.draw_update_confirmation(ui.ctx());
+        self.draw_profile_dialog(ui.ctx());
+        self.draw_profile_delete(ui.ctx());
 
         // The debounce needs its own wake-up: the software backend waits for
         // events, so an idle window would otherwise not apply or save the
@@ -3349,17 +3919,6 @@ fn metric(ui: &mut Ui, label: &str, value: &str, unit: &str) {
     });
 }
 
-fn trim_number(value: f64) -> String {
-    let mut text = format!("{value:.2}");
-    while text.ends_with('0') {
-        text.pop();
-    }
-    if text.ends_with('.') {
-        text.pop();
-    }
-    text
-}
-
 fn group_digits(value: u64) -> String {
     let text = value.to_string();
     let mut grouped = String::with_capacity(text.len() + text.len() / 3);
@@ -3372,21 +3931,6 @@ fn group_digits(value: u64) -> String {
     }
 
     grouped.chars().rev().collect()
-}
-
-fn settings_equivalent(left: &Settings, right: &Settings) -> bool {
-    left.button == right.button
-        && left.limit == right.limit
-        && left.multi_click == right.multi_click
-        && left.mode == right.mode
-        && left.target == right.target
-        && left.points == right.points
-        && left.point_interval == right.point_interval
-        && left.random_interval == right.random_interval
-        && (left.cps - right.cps).abs() < 0.001
-        && (left.hold_ms() - right.hold_ms()).abs() < 0.001
-        && (left.jitter_pct - right.jitter_pct).abs() < 0.001
-        && (left.delay_ms() - right.delay_ms()).abs() < 0.001
 }
 
 #[cfg(test)]

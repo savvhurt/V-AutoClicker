@@ -500,6 +500,45 @@ pub fn numeric_field(
     )
 }
 
+/// Single-line text input that follows the same field styling as the numeric
+/// controls. Used by the profile dialogs for names and file paths.
+pub fn text_field(ui: &mut Ui, text: &mut String, hint: &str) -> Response {
+    let height = 30.0;
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), height), Sense::hover());
+    ui.painter()
+        .rect_filled(rect, CornerRadius::same(7), theme::field());
+    ui.painter().rect_stroke(
+        rect,
+        CornerRadius::same(7),
+        Stroke::new(1.0_f32, theme::line()),
+        egui::StrokeKind::Inside,
+    );
+
+    let mut child = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(rect.shrink2(egui::vec2(8.0, 3.0)))
+            .layout(Layout::left_to_right(Align::Center)),
+    );
+    child.style_mut().override_font_id = Some(theme::sans(12.5));
+    let response = child.add(
+        egui::TextEdit::singleline(text)
+            .frame(egui::Frame::NONE)
+            .hint_text(hint)
+            .desired_width(f32::INFINITY)
+            .text_color(theme::text()),
+    );
+
+    if response.has_focus() {
+        ui.painter().rect_stroke(
+            rect,
+            CornerRadius::same(7),
+            Stroke::new(1.0_f32, theme::accent()),
+            egui::StrokeKind::Inside,
+        );
+    }
+    response
+}
+
 pub fn integer_field(
     ui: &mut Ui,
     value: &mut u64,

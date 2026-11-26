@@ -265,6 +265,24 @@ impl Settings {
         self.random_interval.as_secs_f64() * 1000.0
     }
 
+    /// Compare click settings with the tolerance used by the daemon sync.
+    /// Stored durations are exact, but the UI works with fractional
+    /// milliseconds, so the numeric fields need a small epsilon.
+    pub fn equivalent(&self, other: &Self) -> bool {
+        self.button == other.button
+            && self.limit == other.limit
+            && self.multi_click == other.multi_click
+            && self.mode == other.mode
+            && self.target == other.target
+            && self.points == other.points
+            && self.point_interval == other.point_interval
+            && self.random_interval == other.random_interval
+            && (self.cps - other.cps).abs() < 0.001
+            && (self.hold_ms() - other.hold_ms()).abs() < 0.001
+            && (self.jitter_pct - other.jitter_pct).abs() < 0.001
+            && (self.delay_ms() - other.delay_ms()).abs() < 0.001
+    }
+
     pub fn point_count(&self) -> usize {
         self.points.iter().flatten().count()
     }
@@ -341,8 +359,10 @@ impl Settings {
     }
 }
 
-fn format_number(value: f64) -> String {
-    let mut text = format!("{value:.3}");
+/// Format a number with up to `decimals` fractional digits, without trailing
+/// zeroes. Shared by the wire protocol and the GUI so both trim identically.
+pub fn format_decimal(value: f64, decimals: usize) -> String {
+    let mut text = format!("{value:.decimals$}");
     while text.ends_with('0') {
         text.pop();
     }
@@ -350,6 +370,10 @@ fn format_number(value: f64) -> String {
         text.pop();
     }
     text
+}
+
+fn format_number(value: f64) -> String {
+    format_decimal(value, 3)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1056,6 +1080,26 @@ impl SharedState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn settings_equivalence_uses_a_small_tolerance() {
+        let base = Settings::new(50.0, Button::Left, 10.0, 1.5).unwrap();
+        let same = Settings::new(50.0004, Button::Left, 10.0004, 1.5004).unwrap();
+        let different = Settings::new(50.1, Button::Left, 10.0, 1.5).unwrap();
+
+        assert!(base.equivalent(&same));
+        assert!(!base.equivalent(&different));
+        assert!(!base.equivalent(&base.with_multi_click(2).unwrap()));
+    }
+
+    #[test]
+    fn decimal_formatting_trims_only_trailing_zeroes() {
+        assert_eq!(format_decimal(10.0, 3), "10");
+        assert_eq!(format_decimal(10.5, 3), "10.5");
+        assert_eq!(format_decimal(10.125, 3), "10.125");
+        assert_eq!(format_decimal(10.1256, 2), "10.13");
+        assert_eq!(format_decimal(0.0, 2), "0");
+    }
 
     #[test]
     fn settings_reject_out_of_range_values() {

@@ -1,5 +1,6 @@
 mod app;
 mod config;
+mod profiles;
 mod theme;
 #[cfg(windows)]
 mod tray;

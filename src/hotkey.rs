@@ -113,6 +113,7 @@ impl Hotkey {
     }
 
     /// Human-readable form used by the GUI, e.g. `CTRL + ALT + C`.
+    #[cfg_attr(not(feature = "gui"), allow(dead_code))]
     pub(crate) fn label(&self) -> String {
         let mut parts = Vec::with_capacity(5);
         for (enabled, name, _) in self.parts() {
@@ -145,6 +146,7 @@ impl fmt::Display for Hotkey {
     }
 }
 
+#[cfg_attr(not(feature = "gui"), allow(dead_code))]
 fn key_label(key: &str) -> &str {
     match key {
         "Space" => "Space",

@@ -37,6 +37,8 @@ Native input, four click modes, twenty-nine themes, one small binary.
 - **Simple and Advanced layouts** - a compact Start/Stop panel or the full
   tabbed interface, switchable at any time.
 - **Eyedropper** for capturing coordinates; single, double and triple clicks.
+- **Click profiles** with four built-in presets, portable `.toml` export and
+  import, and one-click switching in the System tab.
 - **Global hotkeys** on Windows, compositor bindings on Linux.
 - **Hold-to-click** on Windows with a second hotkey.
 - **Autostart** on both platforms, plus optional **minimize to tray** on Windows.
@@ -231,6 +233,48 @@ window-rule {
     open-floating true
 }
 ```
+
+### Profiles
+
+<p align="center">
+  <img src="docs/gui-profiles.png" alt="Click profiles in the System tab" width="460">
+</p>
+
+The **System** tab starts with a profile selector. A profile stores every click
+parameter: speed, button, hold, jitter, limit, delay, multi-click, mode, points
+and intervals. Theme, language and hotkeys stay global, so switching profiles
+never changes how the window looks or how the shortcut works.
+
+- Four read-only presets: **Default**, **Precise**, **Fast** and **Double click**.
+- **Save** updates the selected user profile; **Save as…** creates a new one.
+- **Export…** writes the current settings to any file path. A `.toml` extension
+  is added automatically and an existing file is replaced after a warning.
+- **Import…** adds a profile from a file. A duplicate name gets a ` (2)` suffix.
+- The line under the selector shows the current summary and a `modified` badge
+  when the settings no longer match the selected profile.
+
+Profiles are stored inside `gui.toml`. An exported file is portable and looks
+like this:
+
+```toml
+format = 1
+name = "Precise"
+
+[settings]
+cps = 10.0
+button = "left"
+hold_ms = 40.0
+jitter_pct = 0.0
+limit = 0
+delay_ms = 0.0
+multi_click = 1
+mode = "cursor"
+point_interval_ms = 100
+random_interval_ms = 500
+```
+
+Old `gui.toml` files that still contain the flat `[[profiles]]` section from
+0.9.x are migrated on load instead of being discarded.
 
 Available themes:
 

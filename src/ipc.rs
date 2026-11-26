@@ -87,10 +87,6 @@ pub fn send_or_spawn(command: &str) -> Result<String> {
     send_or_spawn_with_hotkeys(command, crate::hotkey::DEFAULT, None)
 }
 
-pub fn send_or_spawn_with_hotkey(command: &str, hotkey: &str) -> Result<String> {
-    send_or_spawn_with_hotkeys(command, hotkey, None)
-}
-
 pub fn send_or_spawn_with_hotkeys(
     command: &str,
     hotkey: &str,

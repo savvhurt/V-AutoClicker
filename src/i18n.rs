@@ -113,6 +113,10 @@ macro_rules! define_strings {
             $($variant),*
         }
 
+        impl Key {
+            pub const ALL: &'static [Self] = &[$(Self::$variant),*];
+        }
+
         pub fn tr(lang: Lang, key: Key) -> &'static str {
             match key {
                 $(
@@ -871,6 +875,271 @@ define_strings! {
         "No se pudo reiniciar como administrador: {}",
         "Não foi possível reiniciar como administrador: {}"
     ],
+    RowProfile: ["PROFILE", "ПРОФИЛЬ", "PROFIL", "PROFIL", "PERFIL", "PERFIL"],
+    HintProfile: [
+        "Switch the click settings between saved profiles.",
+        "Переключение параметров кликов между сохранёнными профилями.",
+        "Wechselt die Klick-Einstellungen zwischen gespeicherten Profilen.",
+        "Changer les réglages de clic entre les profils enregistrés.",
+        "Cambia los ajustes de clic entre perfiles guardados.",
+        "Alterna as configurações de clique entre perfis salvos."
+    ],
+    ProfileModified: [
+        "modified",
+        "изменён",
+        "geändert",
+        "modifié",
+        "modificado",
+        "modificado"
+    ],
+    ProfileSave: ["SAVE", "СОХРАНИТЬ", "SPEICHERN", "ENREGISTRER", "GUARDAR", "SALVAR"],
+    ProfileSaveAs: [
+        "SAVE AS…",
+        "СОХРАНИТЬ КАК…",
+        "SPEICHERN UNTER…",
+        "ENREGISTRER SOUS…",
+        "GUARDAR COMO…",
+        "SALVAR COMO…"
+    ],
+    ProfileExport: [
+        "EXPORT…",
+        "ЭКСПОРТ…",
+        "EXPORTIEREN…",
+        "EXPORTER…",
+        "EXPORTAR…",
+        "EXPORTAR…"
+    ],
+    ProfileImport: [
+        "IMPORT…",
+        "ИМПОРТ…",
+        "IMPORTIEREN…",
+        "IMPORTER…",
+        "IMPORTAR…",
+        "IMPORTAR…"
+    ],
+    ProfileDelete: ["DELETE", "УДАЛИТЬ", "LÖSCHEN", "SUPPRIMER", "ELIMINAR", "EXCLUIR"],
+    ProfilePresetDefault: ["Default", "Обычный", "Standard", "Standard", "Estándar", "Padrão"],
+    ProfilePresetPrecise: ["Precise", "Точный", "Präzise", "Précis", "Preciso", "Preciso"],
+    ProfilePresetFast: ["Fast", "Быстрый", "Schnell", "Rapide", "Rápido", "Rápido"],
+    ProfilePresetDouble: [
+        "Double click",
+        "Двойной",
+        "Doppelklick",
+        "Double clic",
+        "Doble clic",
+        "Clique duplo"
+    ],
+    ProfileSaved: [
+        "Profile saved.",
+        "Профиль сохранён.",
+        "Profil gespeichert.",
+        "Profil enregistré.",
+        "Perfil guardado.",
+        "Perfil salvo."
+    ],
+    ProfileSavedAs: [
+        "Profile “{}” saved.",
+        "Профиль «{}» сохранён.",
+        "Profil „{}“ gespeichert.",
+        "Profil « {} » enregistré.",
+        "Perfil «{}» guardado.",
+        "Perfil “{}” salvo."
+    ],
+    ProfileApplied: [
+        "Profile “{}” applied.",
+        "Профиль «{}» применён.",
+        "Profil „{}“ angewendet.",
+        "Profil « {} » appliqué.",
+        "Perfil «{}» aplicado.",
+        "Perfil “{}” aplicado."
+    ],
+    ProfileExported: [
+        "Profile saved to {}",
+        "Профиль сохранён в {}",
+        "Profil gespeichert unter {}",
+        "Profil enregistré dans {}",
+        "Perfil guardado en {}",
+        "Perfil salvo em {}"
+    ],
+    ProfileImported: [
+        "Profile “{}” imported.",
+        "Профиль «{}» импортирован.",
+        "Profil „{}“ importiert.",
+        "Profil « {} » importé.",
+        "Perfil «{}» importado.",
+        "Perfil “{}” importado."
+    ],
+    ProfileDeleted: [
+        "Profile “{}” deleted.",
+        "Профиль «{}» удалён.",
+        "Profil „{}“ gelöscht.",
+        "Profil « {} » supprimé.",
+        "Perfil «{}» eliminado.",
+        "Perfil “{}” excluído."
+    ],
+    ProfileDeleteTitle: ["PROFILE", "ПРОФИЛЬ", "PROFIL", "PROFIL", "PERFIL", "PERFIL"],
+    ProfileDeleteQuestion: [
+        "Delete “{}”?",
+        "Удалить «{}»?",
+        "„{}“ löschen?",
+        "Supprimer « {} » ?",
+        "¿Eliminar «{}»?",
+        "Excluir “{}”?"
+    ],
+    ProfileDeleteText: [
+        "The current click settings stay active, but the saved profile is removed.",
+        "Текущие параметры кликов останутся активными, но сохранённый профиль будет удалён.",
+        "Die aktuellen Klick-Einstellungen bleiben aktiv, das gespeicherte Profil wird entfernt.",
+        "Les réglages de clic actuels restent actifs, mais le profil enregistré est supprimé.",
+        "Los ajustes de clic actuales siguen activos, pero el perfil guardado se elimina.",
+        "As configurações de clique atuais continuam ativas, mas o perfil salvo é removido."
+    ],
+    ProfileSaveAsTitle: [
+        "SAVE PROFILE",
+        "СОХРАНИТЬ ПРОФИЛЬ",
+        "PROFIL SPEICHERN",
+        "ENREGISTRER LE PROFIL",
+        "GUARDAR PERFIL",
+        "SALVAR PERFIL"
+    ],
+    ProfileSaveAsQuestion: [
+        "Save the current settings as a profile",
+        "Сохранить текущие настройки как профиль",
+        "Aktuelle Einstellungen als Profil speichern",
+        "Enregistrer les réglages actuels comme profil",
+        "Guardar los ajustes actuales como perfil",
+        "Salvar as configurações atuais como perfil"
+    ],
+    ProfileSaveAsText: [
+        "A profile stores click settings only. Theme, language and hotkeys stay global.",
+        "Профиль хранит только параметры кликов. Тема, язык и горячие клавиши остаются общими.",
+        "Ein Profil speichert nur Klick-Einstellungen. Design, Sprache und Tasten bleiben global.",
+        "Un profil ne contient que les réglages de clic. Le thème, la langue et les raccourcis restent globaux.",
+        "Un perfil solo guarda los ajustes de clic. El tema, el idioma y los atajos son globales.",
+        "Um perfil guarda apenas as configurações de clique. Tema, idioma e atalhos são globais."
+    ],
+    ProfileNameLabel: [
+        "PROFILE NAME",
+        "ИМЯ ПРОФИЛЯ",
+        "PROFILNAME",
+        "NOM DU PROFIL",
+        "NOMBRE DEL PERFIL",
+        "NOME DO PERFIL"
+    ],
+    ProfileNameHint: [
+        "Profile name",
+        "Имя профиля",
+        "Profilname",
+        "Nom du profil",
+        "Nombre del perfil",
+        "Nome do perfil"
+    ],
+    ProfileExportTitle: [
+        "EXPORT PROFILE",
+        "ЭКСПОРТ ПРОФИЛЯ",
+        "PROFIL EXPORTIEREN",
+        "EXPORTER LE PROFIL",
+        "EXPORTAR PERFIL",
+        "EXPORTAR PERFIL"
+    ],
+    ProfileExportQuestion: [
+        "Save the profile to a file",
+        "Сохранить профиль в файл",
+        "Profil in einer Datei speichern",
+        "Enregistrer le profil dans un fichier",
+        "Guardar el perfil en un archivo",
+        "Salvar o perfil em um arquivo"
+    ],
+    ProfileExportText: [
+        "Enter any file path. A .toml extension is added automatically.",
+        "Укажите любой путь к файлу. Расширение .toml добавится автоматически.",
+        "Beliebigen Dateipfad eingeben. Die Endung .toml wird automatisch ergänzt.",
+        "Indiquez n'importe quel chemin. L'extension .toml est ajoutée automatiquement.",
+        "Indica cualquier ruta de archivo. La extensión .toml se añade automáticamente.",
+        "Informe qualquer caminho de arquivo. A extensão .toml é adicionada automaticamente."
+    ],
+    ProfileOverwriteWarning: [
+        "A file with this name already exists and will be replaced.",
+        "Файл с таким именем уже существует и будет заменён.",
+        "Eine Datei mit diesem Namen existiert bereits und wird ersetzt.",
+        "Un fichier portant ce nom existe déjà et sera remplacé.",
+        "Ya existe un archivo con este nombre y se reemplazará.",
+        "Já existe um arquivo com este nome e ele será substituído."
+    ],
+    ProfileImportTitle: [
+        "IMPORT PROFILE",
+        "ИМПОРТ ПРОФИЛЯ",
+        "PROFIL IMPORTIEREN",
+        "IMPORTER LE PROFIL",
+        "IMPORTAR PERFIL",
+        "IMPORTAR PERFIL"
+    ],
+    ProfileImportQuestion: [
+        "Open a profile file",
+        "Открыть файл профиля",
+        "Eine Profildatei öffnen",
+        "Ouvrir un fichier de profil",
+        "Abrir un archivo de perfil",
+        "Abrir um arquivo de perfil"
+    ],
+    ProfileImportText: [
+        "Enter the path to a profile .toml file.",
+        "Укажите путь к .toml файлу профиля.",
+        "Pfad zu einer Profildatei im .toml-Format eingeben.",
+        "Indiquez le chemin d'un fichier de profil .toml.",
+        "Indica la ruta de un archivo de perfil .toml.",
+        "Informe o caminho de um arquivo de perfil .toml."
+    ],
+    ProfilePathLabel: [
+        "FILE PATH",
+        "ПУТЬ К ФАЙЛУ",
+        "DATEIPFAD",
+        "CHEMIN DU FICHIER",
+        "RUTA DEL ARCHIVO",
+        "CAMINHO DO ARQUIVO"
+    ],
+    ProfilePathHint: [
+        "~/Documents/profile.toml",
+        "~/Документы/профиль.toml",
+        "~/Dokumente/profil.toml",
+        "~/Documents/profil.toml",
+        "~/Documentos/perfil.toml",
+        "~/Documentos/perfil.toml"
+    ],
+    ProfileDialogSave: ["SAVE", "СОХРАНИТЬ", "SPEICHERN", "ENREGISTRER", "GUARDAR", "SALVAR"],
+    ProfileDialogOpen: ["OPEN", "ОТКРЫТЬ", "ÖFFNEN", "OUVRIR", "ABRIR", "ABRIR"],
+    ProfileNameEmpty: [
+        "Enter a profile name.",
+        "Введите имя профиля.",
+        "Profilnamen eingeben.",
+        "Saisissez un nom de profil.",
+        "Introduce un nombre de perfil.",
+        "Informe um nome de perfil."
+    ],
+    ProfileNameTooLong: [
+        "The profile name is longer than 40 characters.",
+        "Имя профиля длиннее 40 символов.",
+        "Der Profilname ist länger als 40 Zeichen.",
+        "Le nom du profil dépasse 40 caractères.",
+        "El nombre del perfil supera los 40 caracteres.",
+        "O nome do perfil tem mais de 40 caracteres."
+    ],
+    ProfileExportFailed: [
+        "Could not save the profile: {:#}",
+        "Не удалось сохранить профиль: {:#}",
+        "Profil konnte nicht gespeichert werden: {:#}",
+        "Impossible d'enregistrer le profil : {:#}",
+        "No se pudo guardar el perfil: {:#}",
+        "Não foi possível salvar o perfil: {:#}"
+    ],
+    ProfileImportFailed: [
+        "Could not import the profile: {:#}",
+        "Не удалось импортировать профиль: {:#}",
+        "Profil konnte nicht importiert werden: {:#}",
+        "Impossible d'importer le profil : {:#}",
+        "No se pudo importar el perfil: {:#}",
+        "Não foi possível importar o perfil: {:#}"
+    ],
     DefaultsButton: [
         "RESTORE DEFAULTS",
         "СБРОСИТЬ НАСТРОЙКИ",
@@ -1345,12 +1614,35 @@ mod tests {
         assert_eq!(lang_from_locale("ja_JP"), None);
     }
 
+    fn placeholders(text: &str) -> Vec<&str> {
+        let mut found = Vec::new();
+        let mut rest = text;
+        while let Some(start) = rest.find('{') {
+            let Some(end) = rest[start..].find('}') else {
+                break;
+            };
+            found.push(&rest[start..=start + end]);
+            rest = &rest[start + end + 1..];
+        }
+        found.sort_unstable();
+        found
+    }
+
     #[test]
-    fn every_key_has_a_translation() {
-        for language in Language::ALL {
-            let lang = language.resolve();
-            for key in [Key::TabClicks, Key::MultiHint, Key::AutostartOn] {
-                assert!(!tr(lang, key).is_empty());
+    fn every_key_has_a_translation_with_the_same_placeholders() {
+        for key in Key::ALL {
+            let reference = tr(Lang::En, *key);
+            assert!(!reference.is_empty(), "{key:?} has no English text");
+            let expected = placeholders(reference);
+
+            for lang in [Lang::En, Lang::Ru, Lang::De, Lang::Fr, Lang::Es, Lang::Pt] {
+                let text = tr(lang, *key);
+                assert!(!text.is_empty(), "{key:?} has no translation for {lang:?}");
+                assert_eq!(
+                    placeholders(text),
+                    expected,
+                    "{key:?} has mismatched placeholders for {lang:?}: {text:?}"
+                );
             }
         }
     }

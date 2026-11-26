@@ -1,16 +1,21 @@
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::hotkey::{DEFAULT as DEFAULT_HOTKEY, Hotkey};
-use crate::i18n::Language;
+use crate::i18n::{Key, Language};
 use crate::state::{
     Button, ClickMode, DEFAULT_POINT_INTERVAL_MS, DEFAULT_RANDOM_INTERVAL_MS,
     MAX_RANDOM_INTERVAL_MS, MIN_RANDOM_INTERVAL_MS, Point, Settings,
 };
+
+use super::profiles::{ActiveProfile, Preset, Profile};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Theme {
@@ -195,24 +200,92 @@ impl Theme {
         Self::ALL.get(index).copied().unwrap_or(Self::Paper)
     }
 
-    pub fn is_dark(self) -> bool {
-        matches!(
-            self,
-            Self::Graphite
-                | Self::Ocean
-                | Self::Forest
-                | Self::Midnight
-                | Self::Nord
-                | Self::Matcha
-                | Self::Ember
-                | Self::Plum
-                | Self::Wine
-                | Self::Halloween
-                | Self::Neon
-                | Self::TerminalGreen
-                | Self::Galaxy
-                | Self::Aurora
-        )
+    pub fn label_key(self) -> Key {
+        match self {
+            Self::Paper => Key::ThemePaper,
+            Self::Graphite => Key::ThemeGraphite,
+            Self::Sand => Key::ThemeSand,
+            Self::Ocean => Key::ThemeOcean,
+            Self::Forest => Key::ThemeForest,
+            Self::Contrast => Key::ThemeContrast,
+            Self::Rose => Key::ThemeRose,
+            Self::Lavender => Key::ThemeLavender,
+            Self::Midnight => Key::ThemeMidnight,
+            Self::Nord => Key::ThemeNord,
+            Self::Coffee => Key::ThemeCoffee,
+            Self::Matcha => Key::ThemeMatcha,
+            Self::Glacier => Key::ThemeGlacier,
+            Self::Apricot => Key::ThemeApricot,
+            Self::Mint => Key::ThemeMint,
+            Self::Ember => Key::ThemeEmber,
+            Self::Plum => Key::ThemePlum,
+            Self::Wine => Key::ThemeWine,
+            Self::LiquidGlass => Key::ThemeLiquidGlass,
+            Self::Halloween => Key::ThemeHalloween,
+            Self::Winter => Key::ThemeWinter,
+            Self::Neon => Key::ThemeNeon,
+            Self::TerminalGreen => Key::ThemeTerminalGreen,
+            Self::Spring => Key::ThemeSpring,
+            Self::Summer => Key::ThemeSummer,
+            Self::Autumn => Key::ThemeAutumn,
+            Self::Valentine => Key::ThemeValentine,
+            Self::Galaxy => Key::ThemeGalaxy,
+            Self::Aurora => Key::ThemeAurora,
+        }
+    }
+}
+
+/// The decorative background a theme draws. Keeping this mapping in one place
+/// means a new theme cannot silently end up with the wrong backdrop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Wallpaper {
+    None,
+    Glass,
+    Halloween,
+    Winter,
+    Neon,
+    Terminal,
+    Spring,
+    Summer,
+    Autumn,
+    Valentine,
+    Galaxy,
+    Aurora,
+}
+
+impl Theme {
+    pub fn wallpaper(self) -> Wallpaper {
+        match self {
+            Self::LiquidGlass => Wallpaper::Glass,
+            Self::Halloween => Wallpaper::Halloween,
+            Self::Winter => Wallpaper::Winter,
+            Self::Neon => Wallpaper::Neon,
+            Self::TerminalGreen => Wallpaper::Terminal,
+            Self::Spring => Wallpaper::Spring,
+            Self::Summer => Wallpaper::Summer,
+            Self::Autumn => Wallpaper::Autumn,
+            Self::Valentine => Wallpaper::Valentine,
+            Self::Galaxy => Wallpaper::Galaxy,
+            Self::Aurora => Wallpaper::Aurora,
+            Self::Paper
+            | Self::Graphite
+            | Self::Sand
+            | Self::Ocean
+            | Self::Forest
+            | Self::Contrast
+            | Self::Rose
+            | Self::Lavender
+            | Self::Midnight
+            | Self::Nord
+            | Self::Coffee
+            | Self::Matcha
+            | Self::Glacier
+            | Self::Apricot
+            | Self::Mint
+            | Self::Ember
+            | Self::Plum
+            | Self::Wine => Wallpaper::None,
+        }
     }
 }
 
@@ -227,6 +300,26 @@ pub struct Config {
     pub always_on_top: bool,
     pub minimize_to_tray: bool,
     pub check_updates: bool,
+    pub profiles: Vec<Profile>,
+    pub active_profile: ActiveProfile,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            settings: Settings::default(),
+            hotkey: default_hotkey(),
+            hold_hotkey: String::new(),
+            theme: Theme::Paper,
+            language: Language::Auto,
+            simple_mode: false,
+            always_on_top: false,
+            minimize_to_tray: false,
+            check_updates: true,
+            profiles: Vec::new(),
+            active_profile: ActiveProfile::Preset(Preset::Default),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -256,8 +349,11 @@ impl From<PersistedPoint> for Point {
     }
 }
 
+/// The click-related part of `gui.toml`. Profiles reuse the same fields, so a
+/// profile can be copied between the config and an exported file without a
+/// second hand-written schema.
 #[derive(Debug, Serialize, Deserialize)]
-struct PersistedSettings {
+pub(super) struct PersistedClickSettings {
     cps: f64,
     button: String,
     hold_ms: f64,
@@ -278,6 +374,40 @@ struct PersistedSettings {
     point_interval_ms: u32,
     #[serde(default = "default_random_interval")]
     random_interval_ms: u32,
+}
+
+impl PersistedClickSettings {
+    pub(super) fn new(settings: &Settings) -> Self {
+        Self {
+            cps: settings.cps,
+            button: settings.button.to_string(),
+            hold_ms: settings.hold_ms(),
+            jitter_pct: settings.jitter_pct,
+            limit: settings.limit,
+            delay_ms: settings.delay_ms(),
+            multi_click: settings.multi_click,
+            mode: settings.mode.as_str().to_string(),
+            target: settings.target.map(PersistedPoint::from),
+            points: settings
+                .points
+                .iter()
+                .flatten()
+                .map(|point| PersistedPoint::from(*point))
+                .collect(),
+            point_interval_ms: settings.point_interval_ms().round() as u32,
+            random_interval_ms: settings.random_interval_ms().round() as u32,
+        }
+    }
+
+    pub(super) fn to_settings(&self) -> Result<Settings> {
+        parse_settings(self)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PersistedSettings {
+    #[serde(flatten)]
+    click: PersistedClickSettings,
     #[serde(default = "default_hotkey")]
     hotkey: String,
     #[serde(default)]
@@ -294,29 +424,16 @@ struct PersistedSettings {
     minimize_to_tray: bool,
     #[serde(default = "default_check_updates")]
     check_updates: bool,
+    #[serde(default)]
+    active_profile: String,
+    #[serde(default)]
+    profiles: Vec<PersistedProfile>,
 }
 
 impl PersistedSettings {
     fn new(config: &Config) -> Self {
         Self {
-            cps: config.settings.cps,
-            button: config.settings.button.to_string(),
-            hold_ms: config.settings.hold_ms(),
-            jitter_pct: config.settings.jitter_pct,
-            limit: config.settings.limit,
-            delay_ms: config.settings.delay_ms(),
-            multi_click: config.settings.multi_click,
-            mode: config.settings.mode.as_str().to_string(),
-            target: config.settings.target.map(PersistedPoint::from),
-            points: config
-                .settings
-                .points
-                .iter()
-                .flatten()
-                .map(|point| PersistedPoint::from(*point))
-                .collect(),
-            point_interval_ms: config.settings.point_interval_ms().round() as u32,
-            random_interval_ms: config.settings.random_interval_ms().round() as u32,
+            click: PersistedClickSettings::new(&config.settings),
             hotkey: config.hotkey.clone(),
             hold_hotkey: config.hold_hotkey.clone(),
             theme: config.theme.as_str().to_string(),
@@ -325,7 +442,36 @@ impl PersistedSettings {
             always_on_top: config.always_on_top,
             minimize_to_tray: config.minimize_to_tray,
             check_updates: config.check_updates,
+            active_profile: config.active_profile.encode(),
+            profiles: config.profiles.iter().map(PersistedProfile::new).collect(),
         }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PersistedProfile {
+    name: String,
+    #[serde(flatten)]
+    click: PersistedClickSettings,
+}
+
+impl PersistedProfile {
+    fn new(profile: &Profile) -> Self {
+        Self {
+            name: profile.name.clone(),
+            click: PersistedClickSettings::new(&profile.settings),
+        }
+    }
+
+    fn to_profile(&self) -> Result<Profile> {
+        let name = self.name.trim();
+        if name.is_empty() {
+            anyhow::bail!("profile name cannot be empty");
+        }
+        if name.chars().count() > 40 {
+            anyhow::bail!("profile name is longer than 40 characters");
+        }
+        Ok(Profile::new(name, self.click.to_settings()?))
     }
 }
 
@@ -358,17 +504,7 @@ fn default_check_updates() -> bool {
 }
 
 pub fn load() -> Loaded {
-    let fallback = || Config {
-        settings: Settings::default(),
-        hotkey: default_hotkey(),
-        hold_hotkey: String::new(),
-        theme: Theme::Paper,
-        language: Language::Auto,
-        simple_mode: false,
-        always_on_top: false,
-        minimize_to_tray: false,
-        check_updates: true,
-    };
+    let fallback = Config::default;
 
     let path = match config_path() {
         Ok(path) => path,
@@ -399,32 +535,59 @@ pub fn load() -> Loaded {
         }
     };
 
-    let persisted: PersistedSettings = match toml::from_str(&text) {
-        Ok(persisted) => persisted,
-        Err(error) => {
-            return Loaded {
-                config: fallback(),
-                warning: Some(format!(
-                    "Could not parse {}: {error:#}. Using defaults.",
-                    path.display()
-                )),
-            };
-        }
-    };
+    match parse_config(&text) {
+        Ok(loaded) => loaded,
+        Err(error) => Loaded {
+            config: fallback(),
+            warning: Some(format!(
+                "Could not parse {}: {error:#}. Using defaults.",
+                path.display()
+            )),
+        },
+    }
+}
+
+fn parse_config(text: &str) -> Result<Loaded> {
+    let persisted: PersistedSettings =
+        toml::from_str(text).context("invalid TOML configuration")?;
 
     let mut warnings = Vec::new();
 
-    if legacy_parallel_mode(&persisted.mode) {
+    if legacy_parallel_mode(&persisted.click.mode) {
         warnings.push("Parallel mode was removed. Using Sequence instead.".to_string());
     }
 
-    let settings = match parse_settings(&persisted) {
+    let settings = match parse_settings(&persisted.click) {
         Ok(settings) => settings,
         Err(error) => {
             warnings.push(format!("Invalid click settings: {error:#}"));
             Settings::default()
         }
     };
+
+    let mut profiles = Vec::new();
+    for persisted_profile in &persisted.profiles {
+        match persisted_profile.to_profile() {
+            Ok(profile) => {
+                if profiles
+                    .iter()
+                    .any(|existing: &Profile| existing.name.eq_ignore_ascii_case(&profile.name))
+                {
+                    warnings.push(format!(
+                        "Profile `{}` skipped: the name is already used.",
+                        profile.name
+                    ));
+                } else {
+                    profiles.push(profile);
+                }
+            }
+            Err(error) => warnings.push(format!(
+                "Profile `{}` skipped: {error:#}.",
+                persisted_profile.name
+            )),
+        }
+    }
+    let active_profile = ActiveProfile::decode(&persisted.active_profile, &profiles);
 
     let hotkey = match Hotkey::parse(&persisted.hotkey) {
         Ok(hotkey) => hotkey.to_string(),
@@ -478,12 +641,14 @@ pub fn load() -> Loaded {
         always_on_top: persisted.always_on_top,
         minimize_to_tray: persisted.minimize_to_tray,
         check_updates: persisted.check_updates,
+        profiles,
+        active_profile,
     };
 
-    Loaded {
+    Ok(Loaded {
         config,
         warning: (!warnings.is_empty()).then(|| warnings.join("\n")),
-    }
+    })
 }
 
 fn legacy_parallel_mode(value: &str) -> bool {
@@ -493,7 +658,7 @@ fn legacy_parallel_mode(value: &str) -> bool {
     )
 }
 
-fn parse_settings(persisted: &PersistedSettings) -> Result<Settings> {
+fn parse_settings(persisted: &PersistedClickSettings) -> Result<Settings> {
     let mode = if persisted.mode.trim().is_empty() {
         if persisted.target.is_some() {
             ClickMode::Point
@@ -552,7 +717,7 @@ pub fn config_path() -> Result<PathBuf> {
 pub fn parse(text: &str) -> Result<Settings> {
     let persisted: PersistedSettings =
         toml::from_str(text).context("invalid TOML configuration")?;
-    parse_settings(&persisted)
+    parse_settings(&persisted.click)
 }
 
 pub fn serialize(config: &Config) -> Result<String> {
@@ -572,18 +737,140 @@ pub fn save(config: &Config) -> Result<()> {
     fs::write(&temporary, text)
         .with_context(|| format!("failed to write {}", temporary.display()))?;
 
-    match fs::rename(&temporary, &path) {
-        Ok(()) => Ok(()),
+    replace_file(&temporary, &path)
+}
+
+/// Replace `target` with `source`. On Unix `rename` is already atomic. Windows
+/// refuses to replace an existing file, so keep a backup and restore it if the
+/// second rename fails instead of deleting the previous config first.
+fn replace_file(source: &Path, target: &Path) -> Result<()> {
+    match fs::rename(source, target) {
+        Ok(()) => return Ok(()),
+        Err(error) if !cfg!(windows) || !target.exists() => {
+            let _ = fs::remove_file(source);
+            return Err(error).with_context(|| format!("failed to replace {}", target.display()));
+        }
+        Err(_) => {}
+    }
+
+    let backup = target.with_file_name(format!(".gui.toml.{}.bak", std::process::id()));
+    fs::rename(target, &backup)
+        .with_context(|| format!("failed to back up {}", target.display()))?;
+
+    match fs::rename(source, target) {
+        Ok(()) => {
+            let _ = fs::remove_file(&backup);
+            Ok(())
+        }
         Err(error) => {
-            // `rename` does not replace an existing file on Windows.
-            if path.exists()
-                && fs::remove_file(&path).is_ok()
-                && fs::rename(&temporary, &path).is_ok()
-            {
-                return Ok(());
+            let _ = fs::remove_file(source);
+            let _ = fs::rename(&backup, target);
+            Err(error).with_context(|| format!("failed to replace {}", target.display()))
+        }
+    }
+}
+
+/// Serializes settings on the UI thread and writes them on a small background
+/// thread. Only the newest snapshot is kept, so a slow disk can never build a
+/// backlog while a slider is being dragged. Dragging must also never stall a
+/// frame on file I/O.
+pub struct Saver {
+    pending: Arc<Mutex<Option<Config>>>,
+    wake: Option<Sender<()>>,
+    errors: Receiver<String>,
+    handle: Option<thread::JoinHandle<()>>,
+    fallback_error: Arc<Mutex<Option<String>>>,
+}
+
+impl Saver {
+    pub fn new() -> Self {
+        let (error_sender, errors) = mpsc::channel();
+        let (wake, receiver) = mpsc::channel::<()>();
+        let pending = Arc::new(Mutex::new(None));
+        let thread_pending = Arc::clone(&pending);
+        let handle = thread::Builder::new()
+            .name("v-autoclicker-config-save".to_string())
+            .spawn(move || {
+                while receiver.recv().is_ok() {
+                    // Take the latest snapshot just before writing. A snapshot
+                    // queued during the write is picked up right after it.
+                    loop {
+                        let config = thread_pending.lock().ok().and_then(|mut slot| slot.take());
+                        let Some(config) = config else {
+                            break;
+                        };
+                        if let Err(error) = save(&config) {
+                            let _ = error_sender.send(format!("{error:#}"));
+                        }
+                    }
+                }
+            });
+
+        match handle {
+            Ok(handle) => Self {
+                pending,
+                wake: Some(wake),
+                errors,
+                handle: Some(handle),
+                fallback_error: Arc::new(Mutex::new(None)),
+            },
+            Err(error) => {
+                // Extremely unlikely, but never lose the ability to save.
+                eprintln!("could not start the config saver: {error}");
+                Self {
+                    pending,
+                    wake: None,
+                    errors,
+                    handle: None,
+                    fallback_error: Arc::new(Mutex::new(Some(format!("{error}")))),
+                }
             }
-            let _ = fs::remove_file(&temporary);
-            Err(error).with_context(|| format!("failed to replace {}", path.display()))
+        }
+    }
+
+    pub fn save(&self, config: Config) {
+        match &self.wake {
+            Some(wake) => {
+                if let Ok(mut slot) = self.pending.lock() {
+                    *slot = Some(config);
+                }
+                // A notify may arrive a frame late; the writer always takes
+                // the newest value from the slot, so extra wakes are harmless.
+                let _ = wake.send(());
+            }
+            None => {
+                if let Err(error) = save(&config) {
+                    if let Ok(mut slot) = self.fallback_error.lock() {
+                        *slot = Some(format!("{error:#}"));
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn take_error(&self) -> Option<String> {
+        if let Ok(mut slot) = self.fallback_error.lock() {
+            if let Some(error) = slot.take() {
+                return Some(error);
+            }
+        }
+        self.errors.try_recv().ok()
+    }
+}
+
+impl Default for Saver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for Saver {
+    fn drop(&mut self) {
+        // Closing the wake channel lets the writer drain the latest pending
+        // snapshot and exit; joining guarantees the final state is on disk.
+        self.wake.take();
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
         }
     }
 }
@@ -633,6 +920,11 @@ mod tests {
             always_on_top: true,
             minimize_to_tray: true,
             check_updates: false,
+            profiles: vec![
+                Profile::new("Gaming", Preset::Fast.settings()),
+                Profile::new("Работа", Preset::Precise.settings()),
+            ],
+            active_profile: ActiveProfile::User("Работа".to_string()),
         }
     }
 
@@ -646,17 +938,18 @@ mod tests {
         assert_eq!(parsed.hold_hotkey, "alt+space");
         assert_eq!(parsed.theme, "graphite");
         assert_eq!(parsed.language, "de");
-        assert_eq!(parsed.multi_click, 2);
-        assert_eq!(parsed.mode, "sequence");
-        assert_eq!(parsed.points.len(), 2);
-        assert_eq!(parsed.point_interval_ms, 175);
-        assert_eq!(parsed.random_interval_ms, DEFAULT_RANDOM_INTERVAL_MS);
+        assert_eq!(parsed.click.multi_click, 2);
+        assert_eq!(parsed.click.mode, "sequence");
+        assert_eq!(parsed.click.points.len(), 2);
+        assert_eq!(parsed.click.point_interval_ms, 175);
+        assert_eq!(parsed.click.random_interval_ms, DEFAULT_RANDOM_INTERVAL_MS);
         assert!(parsed.simple_mode);
         assert!(parsed.always_on_top);
         assert!(parsed.minimize_to_tray);
         assert!(!parsed.check_updates);
-        assert!(!text.contains("profiles"));
-        assert!(!text.contains("active_profile"));
+        assert_eq!(parsed.profiles.len(), 2);
+        assert_eq!(parsed.active_profile, "user:Работа");
+        assert!(text.contains("[[profiles]]"));
         assert!(!text.contains("ui_scale"));
 
         let settings = parse(&text).unwrap();
@@ -748,15 +1041,59 @@ mod tests {
     }
 
     #[test]
-    fn legacy_profile_fields_are_ignored() {
+    fn legacy_profiles_are_migrated() {
         let text = "cps = 100\nbutton = \"right\"\nhold_ms = 8\njitter_pct = 0\nhotkey = \"f8\"\nactive_profile = \"Точный\"\n[[profiles]]\nname = \"Точный\"\ncps = 10.0\nbutton = \"left\"\nhold_ms = 40.0\njitter_pct = 0.0\n";
         let persisted: PersistedSettings = toml::from_str(text).unwrap();
         assert_eq!(persisted.theme, "paper");
         assert_eq!(persisted.hold_hotkey, "");
+        assert_eq!(persisted.profiles.len(), 1);
 
         let settings = parse(text).unwrap();
         assert_eq!(settings.cps, 100.0);
         assert_eq!(settings.button, Button::Right);
+
+        let loaded = parse_config(text).unwrap().config;
+        assert_eq!(loaded.profiles.len(), 1);
+        assert_eq!(loaded.profiles[0].name, "Точный");
+        assert_eq!(loaded.profiles[0].settings.cps, 10.0);
+        assert_eq!(
+            loaded.active_profile,
+            ActiveProfile::User("Точный".to_string())
+        );
+    }
+
+    #[test]
+    fn profiles_round_trip_through_the_config() {
+        let config = sample_config();
+        let text = serialize(&config).unwrap();
+        let loaded = parse_config(&text).unwrap().config;
+
+        assert_eq!(loaded.profiles.len(), 2);
+        assert_eq!(loaded.profiles[0].name, "Gaming");
+        assert!(
+            loaded.profiles[0]
+                .settings
+                .equivalent(&Preset::Fast.settings())
+        );
+        assert_eq!(
+            loaded.active_profile,
+            ActiveProfile::User("Работа".to_string())
+        );
+    }
+
+    #[test]
+    fn invalid_and_duplicate_profiles_are_skipped() {
+        let text = "cps = 100\nbutton = \"right\"\nhold_ms = 8\njitter_pct = 0\n\
+                    active_profile = \"preset:fast\"\n\
+                    [[profiles]]\nname = \"Gaming\"\ncps = 10.0\nbutton = \"left\"\nhold_ms = 40.0\njitter_pct = 0.0\n\
+                    [[profiles]]\nname = \"gaming\"\ncps = 20.0\nbutton = \"left\"\nhold_ms = 40.0\njitter_pct = 0.0\n\
+                    [[profiles]]\nname = \"Bad\"\ncps = 0.0\nbutton = \"left\"\nhold_ms = 40.0\njitter_pct = 0.0\n";
+        let loaded = parse_config(text).unwrap();
+        assert!(loaded.warning.unwrap().contains("skipped"));
+        let loaded = loaded.config;
+        assert_eq!(loaded.profiles.len(), 1);
+        assert_eq!(loaded.profiles[0].name, "Gaming");
+        assert_eq!(loaded.active_profile, ActiveProfile::Preset(Preset::Fast));
     }
 
     #[test]
@@ -811,26 +1148,16 @@ mod tests {
     }
 
     #[test]
-    fn dark_themes_are_flagged() {
+    fn every_theme_has_an_explicit_wallpaper() {
+        let mut decorated = 0;
         for theme in Theme::ALL {
-            let expected = matches!(
-                theme,
-                Theme::Graphite
-                    | Theme::Ocean
-                    | Theme::Forest
-                    | Theme::Midnight
-                    | Theme::Nord
-                    | Theme::Matcha
-                    | Theme::Ember
-                    | Theme::Plum
-                    | Theme::Wine
-                    | Theme::Halloween
-                    | Theme::Neon
-                    | Theme::TerminalGreen
-                    | Theme::Galaxy
-                    | Theme::Aurora
-            );
-            assert_eq!(theme.is_dark(), expected, "{theme:?}");
+            if theme.wallpaper() != Wallpaper::None {
+                decorated += 1;
+            }
         }
+        assert_eq!(decorated, 11);
+        assert_eq!(Theme::LiquidGlass.wallpaper(), Wallpaper::Glass);
+        assert_eq!(Theme::TerminalGreen.wallpaper(), Wallpaper::Terminal);
+        assert_eq!(Theme::Paper.wallpaper(), Wallpaper::None);
     }
 }

@@ -6,7 +6,7 @@ use egui::{
     Stroke, TextStyle, Vec2,
 };
 
-use super::config::Theme;
+use super::config::{Theme, Wallpaper};
 
 // Each palette keeps the same signal accent for active clicks while the
 // surrounding surface changes: paper, graphite, sand, ocean, forest, contrast,
@@ -534,15 +534,15 @@ pub fn set_theme(ctx: &egui::Context, theme: Theme) {
 }
 
 fn theme_preference(theme: Theme) -> egui::ThemePreference {
-    if theme.is_dark() {
+    if palette_for(theme).dark {
         egui::ThemePreference::Dark
     } else {
         egui::ThemePreference::Light
     }
 }
 
-fn palette() -> Palette {
-    match Theme::from_index(CURRENT.load(Ordering::Relaxed)) {
+fn palette_for(theme: Theme) -> Palette {
+    match theme {
         Theme::Paper => PAPER,
         Theme::Graphite => GRAPHITE,
         Theme::Sand => SAND,
@@ -573,6 +573,10 @@ fn palette() -> Palette {
         Theme::Galaxy => GALAXY,
         Theme::Aurora => AURORA,
     }
+}
+
+fn palette() -> Palette {
+    palette_for(current_theme())
 }
 
 pub fn bg() -> Color32 {
@@ -627,20 +631,7 @@ fn current_theme() -> Theme {
 }
 
 fn decorated() -> bool {
-    matches!(
-        current_theme(),
-        Theme::LiquidGlass
-            | Theme::Halloween
-            | Theme::Winter
-            | Theme::Neon
-            | Theme::TerminalGreen
-            | Theme::Spring
-            | Theme::Summer
-            | Theme::Autumn
-            | Theme::Valentine
-            | Theme::Galaxy
-            | Theme::Aurora
-    )
+    current_theme().wallpaper() != Wallpaper::None
 }
 
 pub fn text() -> Color32 {
@@ -852,19 +843,19 @@ pub fn paint_backdrop(ui: &egui::Ui) {
     let rect = ui.max_rect();
     let painter = ui.painter();
 
-    match current_theme() {
-        Theme::LiquidGlass => glass_backdrop(painter, rect),
-        Theme::Halloween => halloween_backdrop(painter, rect),
-        Theme::Winter => winter_backdrop(painter, rect),
-        Theme::Neon => neon_backdrop(painter, rect),
-        Theme::TerminalGreen => terminal_backdrop(painter, rect),
-        Theme::Spring => spring_backdrop(painter, rect),
-        Theme::Summer => summer_backdrop(painter, rect),
-        Theme::Autumn => autumn_backdrop(painter, rect),
-        Theme::Valentine => valentine_backdrop(painter, rect),
-        Theme::Galaxy => galaxy_backdrop(painter, rect),
-        Theme::Aurora => aurora_backdrop(painter, rect),
-        _ => {}
+    match current_theme().wallpaper() {
+        Wallpaper::Glass => glass_backdrop(painter, rect),
+        Wallpaper::Halloween => halloween_backdrop(painter, rect),
+        Wallpaper::Winter => winter_backdrop(painter, rect),
+        Wallpaper::Neon => neon_backdrop(painter, rect),
+        Wallpaper::Terminal => terminal_backdrop(painter, rect),
+        Wallpaper::Spring => spring_backdrop(painter, rect),
+        Wallpaper::Summer => summer_backdrop(painter, rect),
+        Wallpaper::Autumn => autumn_backdrop(painter, rect),
+        Wallpaper::Valentine => valentine_backdrop(painter, rect),
+        Wallpaper::Galaxy => galaxy_backdrop(painter, rect),
+        Wallpaper::Aurora => aurora_backdrop(painter, rect),
+        Wallpaper::None => {}
     }
 }
 
